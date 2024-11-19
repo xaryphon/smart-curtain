@@ -1,0 +1,13 @@
+---
+BasedOnStyle: WebKit
+---
+Language: Cpp
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '^<[^\.]+>$'
+    Priority: 1
+  - Regex: '^<'
+    Priority: 2
+  - Regex: '^"'
+    Priority: 3
+---
