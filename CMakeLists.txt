@@ -1,0 +1,53 @@
+cmake_minimum_required(VERSION 3.25)
+
+project(SmartCurtains)
+
+SET(FREERTOS_KERNEL_PATH ${CMAKE_CURRENT_SOURCE_DIR}/vendor/FreeRTOS-KernelV10.6.2)
+
+include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
+include(${FREERTOS_KERNEL_PATH}/portable/ThirdParty/GCC/RP2040/FreeRTOS_Kernel_import.cmake)
+
+set(PICO_BOARD pico_w)
+pico_sdk_init()
+
+add_executable(${PROJECT_NAME})
+
+#add_compile_options(-O0)
+add_subdirectory(src)
+
+set_target_properties(${PROJECT_NAME} PROPERTIES
+        COMPILE_FLAGS "-Wall -Werror"
+)
+
+target_include_directories(${PROJECT_NAME} PRIVATE
+        src
+)
+
+target_compile_definitions(${PROJECT_NAME} PRIVATE
+        WIFI_SSID=\"$ENV{WIFI_SSID}\"
+        WIFI_PASSWORD=\"$ENV{WIFI_PASSWORD}\"
+        NO_SYS=0            # don't want NO_SYS (generally this would be in your lwipopts.h)
+        PICO_CYW43_ARCH_DEFAULT_COUNTRY_CODE=CYW43_COUNTRY_FINLAND
+)
+
+target_link_libraries(${PROJECT_NAME}
+        pico_stdlib
+        hardware_i2c
+        hardware_adc
+        FreeRTOS-Kernel-Heap4
+        pico_cyw43_arch_lwip_sys_freertos
+        pico_lwip_mbedtls
+        pico_mbedtls
+)
+
+# Ignore warnings from lwip code
+set_source_files_properties(
+        ${PICO_LWIP_PATH}/src/apps/altcp_tls/altcp_tls_mbedtls.c
+        PROPERTIES
+        COMPILE_OPTIONS "-Wno-unused-result"
+)
+
+pico_add_uf2_output(${PROJECT_NAME})
+
+pico_enable_stdio_usb(${PROJECT_NAME} 0)
+pico_enable_stdio_uart(${PROJECT_NAME} 1)
