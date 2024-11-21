@@ -4,15 +4,15 @@ project(SmartCurtains)
 
 SET(FREERTOS_KERNEL_PATH ${CMAKE_CURRENT_SOURCE_DIR}/vendor/FreeRTOS-KernelV10.6.2)
 
+set(PICO_BOARD pico_w)
+
 include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
 include(${FREERTOS_KERNEL_PATH}/portable/ThirdParty/GCC/RP2040/FreeRTOS_Kernel_import.cmake)
 
-set(PICO_BOARD pico_w)
 pico_sdk_init()
 
 add_executable(${PROJECT_NAME})
 
-#add_compile_options(-O0)
 add_subdirectory(src)
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
