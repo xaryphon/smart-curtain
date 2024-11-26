@@ -1,4 +1,8 @@
 ---
 Checks: '*,
   -llvmlibc-*,
+  -llvm-header-guard,
+  -altera-unroll-loops,
+  -modernize-use-trailing-return-type,
+  -fuchsia-trailing-return,
   '

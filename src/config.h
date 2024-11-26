@@ -1,0 +1,4 @@
+#pragma once
+
+#define DEFAULT_TASK_STACK_SIZE 256
+#define EXAMPLE_TASK_PRIORITY 1
