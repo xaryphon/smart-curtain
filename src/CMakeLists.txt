@@ -1,4 +1,7 @@
 target_sources(${PROJECT_NAME} PRIVATE
-    example.cpp
-    main.cpp
+        AmbientLightSensor.cpp
+        example.cpp
+        Fmutex.cpp
+        main.cpp
+        PicoI2C.cpp
 )
