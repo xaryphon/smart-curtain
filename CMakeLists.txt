@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(SmartCurtains)
+project(SmartCurtains C CXX ASM)
 
 SET(FREERTOS_KERNEL_PATH ${CMAKE_CURRENT_SOURCE_DIR}/vendor/FreeRTOS-KernelV10.6.2)
 
