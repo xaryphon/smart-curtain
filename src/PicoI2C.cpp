@@ -2,9 +2,9 @@
 // Created by Keijo Länsikunnas on 10.9.2024.
 //
 
-#include <mutex>
 #include "pico/stdlib.h"
 #include "PicoI2C.h"
+#include <mutex>
 
 //#define DEBUG_PRINT_TASK
 
@@ -12,27 +12,41 @@
 #include "DebugTask.h"
 #endif
 
-#define I2C0_SDA_PIN 16
-#define I2C0_SCL_PIN 17
+constexpr int I2C0_SDA_PIN = 16;
+constexpr int I2C0_SCL_PIN = 17;
 
-#define I2C1_SDA_PIN 14
-#define I2C1_SCL_PIN 15
+constexpr int I2C1_SDA_PIN = 14;
+constexpr int I2C1_SCL_PIN = 15;
 
 PicoI2C *PicoI2C::i2c0_instance{nullptr};
 PicoI2C *PicoI2C::i2c1_instance{nullptr};
 
-void PicoI2C::i2c0_irq() {
-    if (i2c0_instance) i2c0_instance->isr();
-    else irq_set_enabled(I2C0_IRQ, false);
+void PicoI2C::i2c0_irq()
+{
+    if (i2c0_instance != nullptr) {
+        i2c0_instance->isr();
+    } else {
+        irq_set_enabled(I2C0_IRQ, false);
+    }
 }
 
-void PicoI2C::i2c1_irq() {
-    if (i2c1_instance) i2c1_instance->isr();
-    else irq_set_enabled(I2C1_IRQ, false); // disable interrupt if we don't have instance
+void PicoI2C::i2c1_irq()
+{
+    if (i2c1_instance != nullptr) {
+        i2c1_instance->isr();
+    } else {
+        irq_set_enabled(I2C1_IRQ, false); // disable interrupt if we don't have instance
+    }
 }
 
 PicoI2C::PicoI2C(uint bus_nr, uint speed) :
-        task_to_notify(nullptr), wbuf{nullptr}, wctr{0}, rbuf{nullptr}, rctr{0}, rcnt{0} {
+        task_to_notify(nullptr),
+        wbuf{nullptr},
+        wctr{0},
+        rbuf{nullptr},
+        rctr{0},
+        rcnt{0}
+        {
     int scl = I2C0_SCL_PIN;
     int sda = I2C0_SDA_PIN;
     switch (bus_nr) {
@@ -55,25 +69,29 @@ PicoI2C::PicoI2C(uint bus_nr, uint speed) :
     gpio_init(sda);
     gpio_pull_up(sda);
     irq_set_enabled(irqn, false);
-    irq_set_exclusive_handler(irqn, bus_nr ? i2c1_irq : i2c0_irq);
+    irq_set_exclusive_handler(irqn, bus_nr != 0U ? i2c1_irq : i2c0_irq);
     i2c_init(i2c, speed);
     gpio_set_function(sda, GPIO_FUNC_I2C);
     gpio_set_function(scl, GPIO_FUNC_I2C);
     // Set FIFO watermarks
     i2c->hw->tx_tl = 0; // TX_FIFO watermark to 0
     i2c->hw->rx_tl = 14; // RX_FIFO watermark to 15 (manual gives impression that level is one higher than reg value)
-    if (bus_nr) i2c1_instance = this;
-    else i2c0_instance = this;
+    if (bus_nr != 0U) {
+        i2c1_instance = this;
+    } else {
+        i2c0_instance = this;
+    }
 }
 
 
-void PicoI2C::tx_fill_fifo() {
+void PicoI2C::tx_fill_fifo()
+{
 #ifdef DEBUG_PRINT_TASK
     int fill{0};
 #endif
     while (wctr > 0 && i2c_get_write_available(i2c) > 0) {
-        bool last = wctr == 1;
-        bool stop = rctr == 0;
+        bool const last = wctr == 1;
+        bool const stop = rctr == 0;
         i2c->hw->data_cmd =
                 // There may be a restart needed instead of (stop)-start
                 bool_to_bit(i2c->restart_on_next) << I2C_IC_DATA_CMD_RESTART_LSB |
@@ -81,10 +99,14 @@ void PicoI2C::tx_fill_fifo() {
                 bool_to_bit(last && stop) << I2C_IC_DATA_CMD_STOP_LSB |
                 *wbuf++;
         // clear restart after first write
-        if (i2c->restart_on_next) i2c->restart_on_next = false;
+        if (i2c->restart_on_next) {
+            i2c->restart_on_next = false;
+        }
         --wctr;
 
-        if (last && !stop) i2c->restart_on_next = true;
+        if (last && !stop) {
+            i2c->restart_on_next = true;
+        }
 #ifdef DEBUG_PRINT_TASK
         ++fill;
 #endif
@@ -95,21 +117,24 @@ void PicoI2C::tx_fill_fifo() {
 }
 
 
-void PicoI2C::rx_fill_fifo() {
+void PicoI2C::rx_fill_fifo()
+{
 #ifdef DEBUG_PRINT_TASK
     int fill{0};
 #endif
 
     while (rctr > 0 && i2c_get_write_available(i2c) > 0) {
-        bool last = rctr == 1;
+        bool const last = rctr == 1;
         i2c->hw->data_cmd =
                 // There may be a restart needed instead of (stop)-start
                 bool_to_bit(i2c->restart_on_next) << I2C_IC_DATA_CMD_RESTART_LSB |
                 // Read is always at the last transaction so stop is issued after last command
                 bool_to_bit(last) << I2C_IC_DATA_CMD_STOP_LSB |
                 I2C_IC_DATA_CMD_CMD_BITS; // -> 1 for read;
-        // clear restart bit after first command
-        if (i2c->restart_on_next) i2c->restart_on_next = false;
+        // clear restart-bit after first command
+        if (i2c->restart_on_next) {
+            i2c->restart_on_next = false;
+        }
         --rctr;
 #ifdef DEBUG_PRINT_TASK
         ++fill;
@@ -122,25 +147,29 @@ void PicoI2C::rx_fill_fifo() {
 }
 
 
-uint PicoI2C::write(uint8_t addr, const uint8_t *buffer, uint length) {
+uint PicoI2C::write(uint8_t addr, const uint8_t *buffer, uint length)
+{
     return transaction(addr, buffer, length, nullptr, 0);
 }
 
 
-uint PicoI2C::read(uint8_t addr, uint8_t *buffer, uint length) {
+uint PicoI2C::read(uint8_t addr, uint8_t *buffer, uint length)
+{
     return transaction(addr, nullptr, 0, buffer, length);
 }
 
 
-uint PicoI2C::transaction(uint8_t addr, const uint8_t *wbuffer, uint wlength, uint8_t *rbuffer, uint rlength) {
+uint PicoI2C::transaction(uint8_t addr, const uint8_t *wbuffer, uint wlength, uint8_t *rbuffer, uint rlength)
+{
     assert((wbuffer && wlength > 0) || (rbuffer && rlength > 0));
-    std::lock_guard<Fmutex> exclusive(access);
+    std::lock_guard<Fmutex> const exclusive(access);
     task_to_notify = xTaskGetCurrentTaskHandle();
 
     i2c->hw->enable = 0;
     i2c->hw->tar = addr;
     i2c->hw->enable = 1;
-    i2c->hw->intr_mask = I2C_IC_INTR_MASK_M_STOP_DET_BITS | I2C_IC_INTR_MASK_M_TX_EMPTY_BITS | I2C_IC_INTR_MASK_M_RX_FULL_BITS;
+    i2c->hw->intr_mask =
+            I2C_IC_INTR_MASK_M_STOP_DET_BITS | I2C_IC_INTR_MASK_M_TX_EMPTY_BITS | I2C_IC_INTR_MASK_M_RX_FULL_BITS;
     i2c->restart_on_next = false;
     // setup transfer
     wbuf = wbuffer;
@@ -150,8 +179,11 @@ uint PicoI2C::transaction(uint8_t addr, const uint8_t *wbuffer, uint wlength, ui
     rcnt = rlength; // for counting received bytes
 
     // write is done first if we have a combined transaction
-    if (wctr > 0) tx_fill_fifo();
-    else rx_fill_fifo();
+    if (wctr > 0) {
+        tx_fill_fifo();
+    } else {
+        rx_fill_fifo();
+    }
 
     uint count = wlength + rlength;
     // enable interrupts
@@ -170,7 +202,8 @@ uint PicoI2C::transaction(uint8_t addr, const uint8_t *wbuffer, uint wlength, ui
 }
 
 
-void PicoI2C::isr() {
+void PicoI2C::isr()
+{
     BaseType_t hpw = pdFALSE;
 #ifdef DEBUG_PRINT_TASK
     DebugTask::debug("%d %d %d %d",
@@ -199,7 +232,7 @@ void PicoI2C::isr() {
     DebugTask::debug("read: %d, %d", fill, rcnt);
 #endif
 
-    if (i2c->hw->intr_stat & I2C_IC_INTR_MASK_M_TX_EMPTY_BITS) {
+    if ((i2c->hw->intr_stat & I2C_IC_INTR_MASK_M_TX_EMPTY_BITS) != 0U) {
         // write commands go first
         if (wctr > 0) {
             tx_fill_fifo();
@@ -214,7 +247,7 @@ void PicoI2C::isr() {
     }
 
     // notify if we are done - hw should also issue a stop if transaction is aborted
-    if (i2c->hw->intr_stat & I2C_IC_INTR_MASK_M_STOP_DET_BITS) {
+    if ((i2c->hw->intr_stat & I2C_IC_INTR_MASK_M_STOP_DET_BITS) != 0U) {
         i2c->hw->intr_mask = 0; // mask all interrupts
         (void) i2c->hw->clr_stop_det;
         xTaskNotifyFromISR(task_to_notify, 1, eSetValueWithOverwrite, &hpw);
