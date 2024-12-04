@@ -1,15 +1,14 @@
 cmake_minimum_required(VERSION 3.25)
 
-SET(FREERTOS_KERNEL_PATH ${CMAKE_CURRENT_SOURCE_DIR}/vendor/FreeRTOS-KernelV10.6.2)
-
 set(PICO_BOARD pico_w)
 
 include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
-include(${FREERTOS_KERNEL_PATH}/portable/ThirdParty/GCC/RP2040/FreeRTOS_Kernel_import.cmake)
 
 project(SmartCurtains C CXX ASM)
 
 pico_sdk_init()
+
+add_subdirectory(vendor)
 
 add_executable(${PROJECT_NAME})
 
