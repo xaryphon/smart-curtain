@@ -48,5 +48,5 @@ set_source_files_properties(
 
 pico_add_uf2_output(${PROJECT_NAME})
 
-pico_enable_stdio_usb(${PROJECT_NAME} 0)
+pico_enable_stdio_usb(${PROJECT_NAME} 1)
 pico_enable_stdio_uart(${PROJECT_NAME} 1)
