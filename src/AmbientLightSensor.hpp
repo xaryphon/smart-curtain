@@ -14,10 +14,11 @@ public:
 
 private:
     void SetWaitTime();
+    float Uint16ToLux(uint16_t u16) const;
 
     static constexpr uint8_t MEASUREMENT_TIME_TYPICAL_MS = 120;
 
-    absolute_time_t m_measurement_ready_at_ms { 0 };
+    TickType_t m_measurement_ready_at_ticks { 0 };
     float m_previous_measurement { BH1750::RESET_VALUE };
 };
 

@@ -5,9 +5,6 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
-#define DELAY_MS sleep_ms
-#define GET_TIME_MS (get_absolute_time() / 1000)
-#define DELAY_UNTIL_ABS(abs) sleep_until(abs)
 #define CLIOUT printf
 
 AmbientLightSensor::AmbientLightSensor(const std::shared_ptr<PicoW_I2C>& i2c, BH1750::I2C_dev_addr i2c_dev_addr)
@@ -37,8 +34,8 @@ float AmbientLightSensor::ReadLuxBlocking()
         /// TODO: upgrade to evaluate appropriate resolution mode according to previous measurement
         SetWaitTime();
         SetMode(ONE_TIME_HIGH_RES);
-        DELAY_UNTIL_ABS(m_measurement_ready_at_ms);
-        lux = BH1750::ReadLuxData();
+        vTaskDelay(m_measurement_ready_at_ticks);
+        lux = Uint16ToLux(BH1750::ReadMeasurementData());
         break;
     case CONTINUOUS_HIGH_RES:
     case CONTINUOUS_HIGH_RES_2:
@@ -46,9 +43,10 @@ float AmbientLightSensor::ReadLuxBlocking()
     case ONE_TIME_HIGH_RES:
     case ONE_TIME_HIGH_RES_2:
     case ONE_TIME_LOW_RES:
+        /// TODO: upgrade to evaluate appropriate resolution mode according to previous measurement
         SetWaitTime();
-        DELAY_UNTIL_ABS(m_measurement_ready_at_ms);
-        lux = BH1750::ReadLuxData();
+        vTaskDelay(m_measurement_ready_at_ticks);
+        lux = Uint16ToLux(BH1750::ReadMeasurementData());
         break;
     default:
         CLIOUT("Error: Undefined BH1750 mode #%hhu.\n", BH1750::GetMode());
@@ -66,7 +64,29 @@ void AmbientLightSensor::SetWaitTime()
         wait_time *= 3;
         wait_time /= 2;
     }
-    m_measurement_ready_at_ms = make_timeout_time_ms(wait_time);
+    m_measurement_ready_at_ticks = wait_time / portTICK_PERIOD_MS;
+}
+
+float AmbientLightSensor::Uint16ToLux(uint16_t u16) const
+{
+    if (u16 != BH1750::RESET_VALUE) {
+        auto lux = static_cast<float>(u16);
+        if (BH1750::GetMeasurementTimeMs() != BH1750::MEASUREMENT_TIME_DEFAULT) {
+            auto const measurement_time_factor = static_cast<float>(BH1750::MEASUREMENT_TIME_DEFAULT) / static_cast<float>(BH1750::GetMeasurementTimeMs());
+            lux *= measurement_time_factor;
+        }
+        float mode_factor = MODE_FACTOR_HIGH;
+        auto const mode = BH1750::GetMode();
+        if (mode == CONTINUOUS_HIGH_RES_2 || mode == ONE_TIME_HIGH_RES_2) {
+            mode_factor = MODE_FACTOR_HIGH_2;
+        } else if (mode == CONTINUOUS_LOW_RES || mode == ONE_TIME_LOW_RES) {
+            mode_factor = MODE_FACTOR_LOW;
+        }
+        lux *= mode_factor;
+        lux /= ACCURACY_FACTOR;
+        return lux;
+    }
+    return BH1750::RESET_VALUE;
 }
 
 void test_task(void* params)
@@ -79,7 +99,7 @@ void test_task(void* params)
     ALS.StartContinuousMeasurement();
     while (true) {
         float measurement = ALS.ReadLuxBlocking();
-        printf("Measurement #%u: %f\n", ++m_i, measurement);
+        CLIOUT("Measurement #%u: %f\n", ++m_i, measurement);
     }
 }
 

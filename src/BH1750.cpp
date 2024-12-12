@@ -18,12 +18,20 @@ void BH1750::SetMode(BH1750::mode mode)
     m_write_buffer[0] = mode;
     m_i2c->Write(m_dev_addr, m_write_buffer.data(), I2C_INSTRUCTION_BUF_LEN);
     m_mode = mode;
-    vTaskDelay(pdMS_TO_TICKS(10));
+    vTaskDelay(I2C_GRACE_PERIOD_TICKS);
 }
 
 BH1750::mode BH1750::GetMode() const
 {
     return m_mode;
+}
+
+uint16_t BH1750::ReadMeasurementData()
+{
+    if (m_i2c->Read(m_dev_addr, m_read_buffer.data(), I2C_MEASUREMENT_BUF_LEN) > 0) {
+        return static_cast<uint16_t>((m_read_buffer[0]) << BYTE) | m_read_buffer[1];
+    }
+    return RESET_VALUE;
 }
 
 void BH1750::Reset()
@@ -34,7 +42,7 @@ void BH1750::Reset()
     }
     m_write_buffer[0] = RESET;
     m_i2c->Write(m_dev_addr, m_write_buffer.data(), I2C_INSTRUCTION_BUF_LEN);
-    vTaskDelay(pdMS_TO_TICKS(10));
+    vTaskDelay(I2C_GRACE_PERIOD_TICKS);
     if (mode == POWER_DOWN) {
         SetMode(POWER_DOWN);
     }
@@ -45,54 +53,16 @@ bool BH1750::SetMeasurementTimeMS(uint8_t measurement_time_ms)
     if (MEASUREMENT_TIME_MIN <= measurement_time_ms && measurement_time_ms <= MEASUREMENT_TIME_MAX) {
         m_write_buffer[0] = operation::SET_MTREG_HIGH_BITS | static_cast<uint8_t>(measurement_time_ms & MEASUREMENT_TIME_HIGH_BITS);
         m_i2c->Write(m_dev_addr, m_write_buffer.data(), I2C_INSTRUCTION_BUF_LEN);
-        vTaskDelay(pdMS_TO_TICKS(10));
+        vTaskDelay(I2C_GRACE_PERIOD_TICKS);
         m_write_buffer[0] = operation::SET_MTREG_LOW_BITS | static_cast<uint8_t>(measurement_time_ms & MEASUREMENT_TIME_LOW_BITS);
         m_i2c->Write(m_dev_addr, m_write_buffer.data(), I2C_INSTRUCTION_BUF_LEN);
-        vTaskDelay(pdMS_TO_TICKS(10));
+        vTaskDelay(I2C_GRACE_PERIOD_TICKS);
         m_measurement_time_ms = measurement_time_ms;
         return true;
-    } else {
-        CLIOUT("Measurement time [%hhu] outside accepted range (%hhu - %hhu).\n",
-            measurement_time_ms, MEASUREMENT_TIME_MIN, MEASUREMENT_TIME_MAX);
     }
+    CLIOUT("Error: Measurement time [%hhu] outside accepted range (%hhu - %hhu).\n",
+        measurement_time_ms, MEASUREMENT_TIME_MIN, MEASUREMENT_TIME_MAX);
     return false;
-}
-
-float BH1750::ReadLuxData()
-{
-    auto lux = ConvertUint16ToLux(ReadMeasurementData());
-    if (m_mode == ONE_TIME_HIGH_RES || m_mode == ONE_TIME_HIGH_RES_2 || m_mode == ONE_TIME_LOW_RES) {
-        m_mode = POWER_DOWN;
-    }
-    return lux;
-}
-
-uint16_t BH1750::ReadMeasurementData()
-{
-    if (m_i2c->Read(m_dev_addr, m_read_buffer.data(), I2C_MEASUREMENT_BUF_LEN) > 0) {
-        printf("response\n");
-        return static_cast<uint16_t>((m_read_buffer[0]) << BYTE) | m_read_buffer[1];
-    }
-    return RESET_VALUE;
-}
-
-float BH1750::ConvertUint16ToLux(uint16_t u16) const
-{
-    if (u16 != RESET_VALUE) {
-        auto lux = static_cast<float>(u16);
-        float const measurement_time_factor = static_cast<float>(MEASUREMENT_TIME_DEFAULT) / static_cast<float>(m_measurement_time_ms);
-        lux *= measurement_time_factor;
-        float mode_factor = MODE_FACTOR_HIGH;
-        if (m_mode == CONTINUOUS_HIGH_RES_2 || m_mode == ONE_TIME_HIGH_RES_2) {
-            mode_factor = MODE_FACTOR_HIGH_2;
-        } else if (m_mode == CONTINUOUS_LOW_RES || m_mode == ONE_TIME_LOW_RES) {
-            mode_factor = MODE_FACTOR_LOW;
-        }
-        lux *= mode_factor;
-        lux /= ACCURACY_FACTOR;
-        return lux;
-    }
-    return RESET_VALUE;
 }
 
 uint8_t BH1750::GetMeasurementTimeMs() const
