@@ -38,30 +38,30 @@ void PicoW_I2C::IRQ_I2C1()
 PicoW_I2C::PicoW_I2C(sda0_pin sda, scl0_pin scl, uint baudrate)
     : m_sda(sda)
     , m_scl(scl)
-    , m_irqn(0)
+    , m_irqn(I2C0_IRQ)
     , m_irq_handler(IRQ_I2C0)
     , m_i2c(i2c0)
-    , m_baudrate(baudrate)
-{
-    if (i2c1_instance != nullptr) {
-        printf("Warning: overwriting i2c1.\n");
-    }
-    i2c1_instance = this;
-    Init();
-}
-
-PicoW_I2C::PicoW_I2C(sda1_pin sda, scl1_pin scl, uint baudrate)
-    : m_sda(sda)
-    , m_scl(scl)
-    , m_irqn(1)
-    , m_irq_handler(IRQ_I2C1)
-    , m_i2c(i2c1)
     , m_baudrate(baudrate)
 {
     if (i2c0_instance != nullptr) {
         printf("Warning: overwriting i2c0.\n");
     }
     i2c0_instance = this;
+    Init();
+}
+
+PicoW_I2C::PicoW_I2C(sda1_pin sda, scl1_pin scl, uint baudrate)
+    : m_sda(sda)
+    , m_scl(scl)
+    , m_irqn(I2C1_IRQ)
+    , m_irq_handler(IRQ_I2C1)
+    , m_i2c(i2c1)
+    , m_baudrate(baudrate)
+{
+    if (i2c1_instance != nullptr) {
+        printf("Warning: overwriting i2c1.\n");
+    }
+    i2c1_instance = this;
     Init();
 }
 
