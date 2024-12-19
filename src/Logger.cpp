@@ -1,12 +1,13 @@
 #include "Logger.hpp"
 
-#include <pico/stdlib.h>
 #include <utility>
 
 #define TASK_KONDOM(klass, func) [](void* param) -> void { static_cast<klass*>(param)->func(); }
 
-/// TODO: classify queue creation / handling
-QueueHandle_t Logger::m_syslog_q = xQueueCreate(10, sizeof(log_content *));
+/// TODO: classify queue
+QueueHandle_t Logger::m_syslog_q = xQueueCreate(10, sizeof(log_content*));
+/// TODO: classify mutex
+SemaphoreHandle_t Logger::m_mutex = xSemaphoreCreateMutex();
 uint32_t Logger::m_lost_logs = 0;
 
 Logger::Logger(const char* task_name, uint32_t stack_depth, UBaseType_t priority)
@@ -22,25 +23,6 @@ Logger::Logger(const char* task_name, uint32_t stack_depth, UBaseType_t priority
         Logger::Log("Created task [{}]", task_name);
     } else {
         Logger::Log("Error: Failed to create task [{}]", task_name);
-    }
-}
-
-template <typename... T>
-void Logger::Log(const char* fmt, T&&... args)
-{
-    /// TODO: lock guard
-
-    auto log = new Logger::log_content {
-        /// TODO: real time
-        .timestamp = time_us_64(),
-        .task_name = GetTaskName(),
-        .msg = fmt::vformat(fmt, fmt::make_format_args(std::forward<T...>(args)...))
-    };
-
-    /// TODO: classify queue creation / handling
-    if (xQueueSendToBack(m_syslog_q, &log, 0) != pdTRUE) {
-        delete log;
-        ++Logger::m_lost_logs;
     }
 }
 
@@ -63,7 +45,6 @@ void Logger::Task()
     Logger::Log("Initiated");
     fmt::print("\n"); // jump over buffer garbage
     while (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
-        /// TODO: classify queue creation / handling
         while (xQueueReceive(
                    m_syslog_q,
                    static_cast<void*>(&m_log),
@@ -78,13 +59,13 @@ void Logger::Task()
             delete m_log;
         }
         if (m_lost_logs > 0) {
-            Logger::Log("Warning: {} lost logs.", m_lost_logs);
+            Logger::Log("Warning: lost {} logs.", m_lost_logs);
             Logger::m_lost_logs = 0;
         }
     }
 }
 
-
+/// TODO: with real time, perhaps date or day of the weak
 std::string Logger::FormatTime(uint64_t time)
 {
     enum {
@@ -107,8 +88,10 @@ std::string Logger::FormatTime(uint64_t time)
         time % ms_in_s);
 }
 
+#include <pico/stdlib.h>
 
 #include "config.h"
+#include "example.h"
 
 void test_Logger()
 {
@@ -117,9 +100,15 @@ void test_Logger()
     Logger::Log("Boot");
 
     // Stack size could be investigated further.
-    // Even with plain C const char * 's and non-variadic arguments, it still practically the same.
+    // Even with plain C const char * 's, non-variadic arguments and no explicit memory allocation
+    // it's still practically the same.
     new Logger("Logger", DEFAULT_TASK_STACK_SIZE * 3, 1);
 
+    const char* desc = "extra log #";
+
+    for (uint8_t i = 0; i < 10; ++i) {
+        Logger::Log("{}{}", desc, i);
+    }
+
     Logger::Log("Initializing Scheduler...");
-    vTaskStartScheduler();
 }
