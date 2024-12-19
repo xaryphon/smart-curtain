@@ -30,13 +30,14 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
 )
 
 target_link_libraries(${PROJECT_NAME}
-        pico_stdlib
+        fmt::fmt
+        FreeRTOS-Kernel-Heap4
         hardware_i2c
         hardware_adc
-        FreeRTOS-Kernel-Heap4
         pico_cyw43_arch_lwip_sys_freertos
         pico_lwip_mbedtls
         pico_mbedtls
+        pico_stdlib
 )
 
 # Ignore warnings from lwip code

@@ -10,3 +10,12 @@ CPMAddPackage(
 set(FREERTOS_KERNEL_PATH ${freertos_kernel_SOURCE_DIR})
 include(${FREERTOS_KERNEL_PATH}/portable/ThirdParty/GCC/RP2040/FreeRTOS_Kernel_import.cmake)
 
+
+CPMAddPackage(
+        NAME fmt
+        GIT_REPOSITORY https://github.com/fmtlib/fmt.git
+        GIT_TAG        a33701196adfad74917046096bf5a2aa0ab0bb50 # 9.1.0
+        OPTIONS
+        "FMT_DOC OFF"
+        "FMT_TEST OFF"
+)
