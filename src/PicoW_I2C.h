@@ -5,12 +5,13 @@
 
 #pragma once
 
+#include <FreeRTOS.h>
+#include <hardware/i2c.h>
+#include <pico/stdlib.h>
+#include <semphr.h>
+#include <task.h>
+
 #include "Fmutex.h"
-#include "FreeRTOS.h"
-#include "hardware/i2c.h"
-#include "pico/stdlib.h"
-#include "semphr.h"
-#include "task.h"
 
 class PicoW_I2C {
 public:
