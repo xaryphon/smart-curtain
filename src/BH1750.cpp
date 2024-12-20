@@ -36,7 +36,7 @@ uint16_t BH1750::ReadMeasurementData()
 
 void BH1750::Reset()
 {
-    auto const mode = GetMode();
+    const mode mode = GetMode();
     if (mode == POWER_DOWN) {
         SetMode(POWER_ON);
     }

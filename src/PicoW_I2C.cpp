@@ -90,8 +90,8 @@ void PicoW_I2C::FillTxFifo()
     int fill { 0 };
 #endif
     while (m_wctr > 0 && i2c_get_write_available(m_i2c) > 0) {
-        bool const last = m_wctr == 1;
-        bool const stop = m_rctr == 0;
+        const bool last = m_wctr == 1;
+        const bool stop = m_rctr == 0;
         m_i2c->hw->data_cmd =
             // There may be a restart needed instead of (stop)-start
             bool_to_bit(m_i2c->restart_on_next) << I2C_IC_DATA_CMD_RESTART_LSB |

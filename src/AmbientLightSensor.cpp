@@ -16,7 +16,7 @@ void AmbientLightSensor::StartContinuousMeasurement()
 {
     SetWaitTime();
     /// TODO: upgrade to evaluate appropriate resolution mode according to previous measurement
-    auto const new_mode = CONTINUOUS_HIGH_RES;
+    const mode new_mode = CONTINUOUS_HIGH_RES;
     BH1750::SetMode(new_mode);
 }
 
@@ -72,11 +72,11 @@ float AmbientLightSensor::Uint16ToLux(uint16_t u16) const
     if (u16 != BH1750::RESET_VALUE) {
         auto lux = static_cast<float>(u16);
         if (BH1750::GetMeasurementTimeMs() != BH1750::MEASUREMENT_TIME_DEFAULT) {
-            auto const measurement_time_factor = static_cast<float>(BH1750::MEASUREMENT_TIME_DEFAULT) / static_cast<float>(BH1750::GetMeasurementTimeMs());
+            const float measurement_time_factor = static_cast<float>(BH1750::MEASUREMENT_TIME_DEFAULT) / static_cast<float>(BH1750::GetMeasurementTimeMs());
             lux *= measurement_time_factor;
         }
         float mode_factor = MODE_FACTOR_HIGH;
-        auto const mode = BH1750::GetMode();
+        const mode mode = BH1750::GetMode();
         if (mode == CONTINUOUS_HIGH_RES_2 || mode == ONE_TIME_HIGH_RES_2) {
             mode_factor = MODE_FACTOR_HIGH_2;
         } else if (mode == CONTINUOUS_LOW_RES || mode == ONE_TIME_LOW_RES) {
