@@ -56,8 +56,8 @@ protected:
     static constexpr float ACCURACY_FACTOR = 1.2;
 
 private:
-    static constexpr uint8_t I2C_INSTRUCTION_BUF_LEN = 1;
-    static constexpr uint8_t I2C_MEASUREMENT_BUF_LEN = 2;
+    static constexpr size_t I2C_INSTRUCTION_BUF_LEN = sizeof(uint8_t);
+    static constexpr size_t I2C_MEASUREMENT_BUF_LEN = sizeof(uint16_t);
     static constexpr uint32_t I2C_GRACE_PERIOD_TICKS = pdMS_TO_TICKS(10);
     static constexpr uint8_t MEASUREMENT_TIME_HIGH_BITS = 0b11100000U;
     static constexpr uint8_t MEASUREMENT_TIME_LOW_BITS = 0b00011111U;
