@@ -4,7 +4,7 @@
 
 #define CLIOUT printf
 
-BH1750::BH1750(const std::shared_ptr<PicoW_I2C>& i2c, BH1750::I2CDevAddr i2c_dev_addr)
+BH1750::BH1750(PicoW_I2C* i2c, BH1750::I2CDevAddr i2c_dev_addr)
     : m_i2c(i2c)
     , m_dev_addr(i2c_dev_addr)
 {

@@ -7,7 +7,7 @@
 
 #define CLIOUT printf
 
-AmbientLightSensor::AmbientLightSensor(const std::shared_ptr<PicoW_I2C>& i2c, BH1750::I2CDevAddr i2c_dev_addr)
+AmbientLightSensor::AmbientLightSensor(PicoW_I2C* i2c, BH1750::I2CDevAddr i2c_dev_addr)
     : BH1750(i2c, i2c_dev_addr)
 {
 }
@@ -91,8 +91,8 @@ void test_task(void* params)
 {
     auto sda = PicoW_I2C::SDA1Pin::SDA1_26;
     auto scl = PicoW_I2C::SCL1Pin::SCL1_27;
-    auto i2c_1 = std::make_shared<PicoW_I2C>(sda, scl, BH1750::BAUDRATE_MAX);
-    auto ALS = AmbientLightSensor(i2c_1, BH1750::I2CDevAddr::ADDR_LOW);
+    auto i2c_1 = std::make_unique<PicoW_I2C>(sda, scl, BH1750::BAUDRATE_MAX);
+    auto ALS = AmbientLightSensor(i2c_1.get(), BH1750::I2CDevAddr::ADDR_LOW);
     uint m_i = 0;
     ALS.StartContinuousMeasurement();
     while (true) {

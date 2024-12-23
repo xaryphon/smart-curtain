@@ -38,7 +38,7 @@ protected:
         // clang-format on
     };
 
-    explicit BH1750(const std::shared_ptr<PicoW_I2C>& picoI2C, BH1750::I2CDevAddr i2c_dev_addr);
+    explicit BH1750(PicoW_I2C* picoI2C, BH1750::I2CDevAddr i2c_dev_addr);
     void SetMode(BH1750::Mode mode);
     BH1750::Mode GetMode() const;
     uint16_t ReadMeasurementData();
@@ -62,10 +62,10 @@ private:
     static constexpr uint8_t MEASUREMENT_TIME_HIGH_BITS = 0b11100000U;
     static constexpr uint8_t MEASUREMENT_TIME_LOW_BITS = 0b00011111U;
 
-    std::shared_ptr<PicoW_I2C> m_i2c;
+    PicoW_I2C* m_i2c;
     BH1750::I2CDevAddr m_dev_addr;
-    std::array<uint8_t, I2C_INSTRUCTION_BUF_LEN> m_write_buffer;
-    std::array<uint8_t, I2C_MEASUREMENT_BUF_LEN> m_read_buffer;
+    std::array<uint8_t, I2C_INSTRUCTION_BUF_LEN> m_write_buffer = {};
+    std::array<uint8_t, I2C_MEASUREMENT_BUF_LEN> m_read_buffer = {};
     BH1750::Mode m_mode = POWER_DOWN;
     uint8_t m_measurement_time_ms = MEASUREMENT_TIME_DEFAULT;
 };

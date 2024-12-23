@@ -5,9 +5,9 @@
 #include "BH1750.hpp"
 #include "PicoW_I2C.h"
 
-class AmbientLightSensor : BH1750 {
+class AmbientLightSensor : private BH1750 {
 public:
-    explicit AmbientLightSensor(const std::shared_ptr<PicoW_I2C>& i2c, BH1750::I2CDevAddr i2c_dev_addr);
+    explicit AmbientLightSensor(PicoW_I2C* i2c, BH1750::I2CDevAddr i2c_dev_addr);
     void StartContinuousMeasurement();
     void StopContinuousMeasurement();
     float ReadLuxBlocking();
