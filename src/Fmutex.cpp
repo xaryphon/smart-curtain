@@ -1,28 +1,21 @@
-/*
- * Fmutex.cpp
- *
- *  Created on: 15.8.2017
- *      Author: krl
- */
-
 #include "Fmutex.h"
 
 Fmutex::Fmutex()
+    : m_mutex(xSemaphoreCreateMutex())
 {
-	mutex = xSemaphoreCreateMutex();
 }
 
 Fmutex::~Fmutex()
 {
-	vSemaphoreDelete(mutex);
+    vSemaphoreDelete(m_mutex);
 }
 
 void Fmutex::lock()
 {
-	xSemaphoreTake(mutex, portMAX_DELAY);
+    xSemaphoreTake(m_mutex, portMAX_DELAY);
 }
 
 void Fmutex::unlock()
 {
-	xSemaphoreGive(mutex);
+    xSemaphoreGive(m_mutex);
 }
