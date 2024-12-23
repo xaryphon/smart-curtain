@@ -18,8 +18,8 @@ private:
 
     static constexpr uint8_t MEASUREMENT_TIME_TYPICAL_MS = 120;
 
-    TickType_t m_measurement_ready_at_ticks { 0 };
-    float m_previous_measurement { BH1750::RESET_VALUE };
+    TickType_t m_measurement_ready_in_ticks = 0;
+    float m_previous_measurement = BH1750::RESET_VALUE;
 };
 
 void test_ALS();

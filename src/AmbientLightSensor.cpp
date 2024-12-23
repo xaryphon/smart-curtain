@@ -34,7 +34,7 @@ float AmbientLightSensor::ReadLuxBlocking()
         /// TODO: upgrade to evaluate appropriate resolution mode according to previous measurement
         SetWaitTime();
         SetMode(ONE_TIME_HIGH_RES);
-        vTaskDelay(m_measurement_ready_at_ticks);
+        vTaskDelay(m_measurement_ready_in_ticks);
         lux = Uint16ToLux(BH1750::ReadMeasurementData());
         break;
     case CONTINUOUS_HIGH_RES:
@@ -45,7 +45,7 @@ float AmbientLightSensor::ReadLuxBlocking()
     case ONE_TIME_LOW_RES:
         /// TODO: upgrade to evaluate appropriate resolution mode according to previous measurement
         SetWaitTime();
-        vTaskDelay(m_measurement_ready_at_ticks);
+        vTaskDelay(m_measurement_ready_in_ticks);
         lux = Uint16ToLux(BH1750::ReadMeasurementData());
         break;
     default:
@@ -64,7 +64,7 @@ void AmbientLightSensor::SetWaitTime()
         wait_time *= 3;
         wait_time /= 2;
     }
-    m_measurement_ready_at_ticks = wait_time / portTICK_PERIOD_MS;
+    m_measurement_ready_in_ticks = pdMS_TO_TICKS(wait_time);
 }
 
 float AmbientLightSensor::Uint16ToLux(uint16_t u16) const

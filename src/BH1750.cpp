@@ -35,7 +35,7 @@ uint16_t BH1750::ReadMeasurementData()
         CLIOUT("Warning: I2C measurement read failed.\n");
         return RESET_VALUE;
     }
-    return static_cast<uint16_t>((m_read_buffer[0]) << BYTE) | m_read_buffer[1];
+    return static_cast<uint16_t>((m_read_buffer[0]) << 8U) | m_read_buffer[1];
 }
 
 void BH1750::Reset()

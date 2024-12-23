@@ -66,13 +66,13 @@ private:
     irq_handler_t m_irq_handler;
     i2c_inst* m_i2c;
     uint m_baudrate;
-    TaskHandle_t m_task_to_notify { nullptr };
+    TaskHandle_t m_task_to_notify = nullptr;
     Fmutex m_access;
-    const uint8_t* m_wbuf { nullptr };
-    uint m_wctr { 0 };
-    uint8_t* m_rbuf { 0 };
-    uint m_rctr { 0 };
-    uint m_rcnt { 0 };
+    uint8_t* m_wbuf = nullptr;
+    uint m_wctr = 0;
+    uint8_t* m_rbuf = nullptr;
+    uint m_rctr = 0;
+    uint m_rcnt = 0;
 
     void FillTxFifo();
     void FillRxFifo();

@@ -61,12 +61,11 @@ private:
     static constexpr uint32_t I2C_GRACE_PERIOD_TICKS = pdMS_TO_TICKS(10);
     static constexpr uint8_t MEASUREMENT_TIME_HIGH_BITS = 0b11100000U;
     static constexpr uint8_t MEASUREMENT_TIME_LOW_BITS = 0b00011111U;
-    static constexpr uint8_t BYTE = 8;
 
     std::shared_ptr<PicoW_I2C> m_i2c;
     BH1750::I2C_dev_addr m_dev_addr;
     std::array<uint8_t, I2C_INSTRUCTION_BUF_LEN> m_write_buffer;
     std::array<uint8_t, I2C_MEASUREMENT_BUF_LEN> m_read_buffer;
-    BH1750::mode m_mode { POWER_DOWN };
-    uint8_t m_measurement_time_ms { MEASUREMENT_TIME_DEFAULT };
+    BH1750::mode m_mode = POWER_DOWN;
+    uint8_t m_measurement_time_ms = MEASUREMENT_TIME_DEFAULT;
 };
