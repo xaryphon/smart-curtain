@@ -15,8 +15,11 @@ AmbientLightSensor::AmbientLightSensor(PicoW_I2C* i2c, BH1750::I2CDevAddr i2c_de
 /// TODO: upgrade to evaluate appropriate resolution mode according to previous measurement
 void AmbientLightSensor::StartContinuousMeasurement()
 {
-    SetWaitTime();
+    const BH1750::Mode current_mode = BH1750::GetMode();
     BH1750::SetMode(BH1750::Mode::CONTINUOUS_HIGH_RES);
+    if (current_mode == BH1750::Mode::POWER_DOWN || current_mode == BH1750::Mode::POWER_ON) {
+        m_measurement_ready_in_ticks = GetMediatedTimeTicks();
+    }
 }
 
 void AmbientLightSensor::StopContinuousMeasurement()
@@ -25,65 +28,50 @@ void AmbientLightSensor::StopContinuousMeasurement()
 }
 
 /// TODO: upgrade to evaluate appropriate resolution mode according to previous measurement
-float AmbientLightSensor::ReadLuxBlocking()
+bool AmbientLightSensor::ReadLuxBlocking(float* lux)
 {
-    switch (BH1750::GetMode()) {
-    case BH1750::Mode::POWER_DOWN:
-    case BH1750::Mode::POWER_ON:
-        SetWaitTime();
+    const BH1750::Mode current_mode = BH1750::GetMode();
+    if (current_mode == BH1750::Mode::POWER_DOWN || current_mode == BH1750::Mode::POWER_ON) {
         SetMode(BH1750::Mode::ONE_TIME_HIGH_RES);
-        break;
-    case BH1750::Mode::CONTINUOUS_HIGH_RES:
-    case BH1750::Mode::CONTINUOUS_HIGH_RES_2:
-    case BH1750::Mode::CONTINUOUS_LOW_RES:
-    case BH1750::Mode::ONE_TIME_HIGH_RES:
-    case BH1750::Mode::ONE_TIME_HIGH_RES_2:
-    case BH1750::Mode::ONE_TIME_LOW_RES:
-        SetWaitTime();
-        break;
-    default:
-        CLIOUT("Error: Undefined BH1750 mode #%hhu.\n", BH1750::GetMode());
-        return static_cast<float>(RESET_VALUE);
+        m_measurement_ready_in_ticks = GetMediatedTimeTicks();
+    }
+    if (!ReadMeasurementData(&m_measurement_data)) {
+        CLIOUT("Warning: Failed to read indoor/outdoor sensor.");
+        return false;
     }
     vTaskDelay(m_measurement_ready_in_ticks);
-    return Uint16ToLux(BH1750::ReadMeasurementData());
+    m_measurement_ready_in_ticks = pdMS_TO_TICKS(BH1750::GetMeasurementTimeMs());
+    *lux = Uint16ToLux(m_measurement_data);
+    return true;
 }
 
-void AmbientLightSensor::SetWaitTime()
+/** Measurement should be waited for for a longer time if measurement starts from a stagnant state.
+ * This is to avoid reading too early, assuring that the module has finished writing the new value to the register.
+ * The safest wait time is in the middle of the expected write time for this read and the expected write time for a potential next read,
+ * as in: (x1 + x2) / 2 = 1.5 x set measurement time
+ */
+TickType_t AmbientLightSensor::GetMediatedTimeTicks() const
 {
-    auto wait_time = static_cast<uint32_t>(BH1750::GetMeasurementTimeMs());
-    if (BH1750::GetMode() == BH1750::Mode::POWER_DOWN || BH1750::GetMode() == BH1750::Mode::POWER_ON) {
-        /** Measurement should be waited for for a longer time if measurement starts from a stagnant state.
-         * This is to avoid reading too early, assuring that the module has finished writing the new value to the register.
-         * The safest wait_time is in the middle of the write for this read and the write for a potential next read,
-         * as in: (x1 + x2) / 2 = 1.5 == 3:2
-         */
-        wait_time *= 3;
-        wait_time /= 2;
-    }
-    m_measurement_ready_in_ticks = pdMS_TO_TICKS(wait_time);
+    return pdMS_TO_TICKS(static_cast<uint32_t>(BH1750::GetMeasurementTimeMs()) * 3 / 2);
 }
 
 float AmbientLightSensor::Uint16ToLux(uint16_t u16) const
 {
-    if (u16 != BH1750::RESET_VALUE) {
-        auto lux = static_cast<float>(u16);
-        if (BH1750::GetMeasurementTimeMs() != BH1750::MEASUREMENT_TIME_DEFAULT) {
-            const float measurement_time_factor = static_cast<float>(BH1750::MEASUREMENT_TIME_DEFAULT) / static_cast<float>(BH1750::GetMeasurementTimeMs());
-            lux *= measurement_time_factor;
-        }
-        float mode_factor = MODE_FACTOR_HIGH;
-        const Mode mode = BH1750::GetMode();
-        if (mode == BH1750::Mode::CONTINUOUS_HIGH_RES_2 || mode == BH1750::Mode::ONE_TIME_HIGH_RES_2) {
-            mode_factor = MODE_FACTOR_HIGH_2;
-        } else if (mode == BH1750::Mode::CONTINUOUS_LOW_RES || mode == BH1750::Mode::ONE_TIME_LOW_RES) {
-            mode_factor = MODE_FACTOR_LOW;
-        }
-        lux *= mode_factor;
-        lux /= ACCURACY_FACTOR;
-        return lux;
+    auto lux = static_cast<float>(u16);
+    if (BH1750::GetMeasurementTimeMs() != BH1750::MEASUREMENT_TIME_DEFAULT) {
+        const float measurement_time_factor = static_cast<float>(BH1750::MEASUREMENT_TIME_DEFAULT) / static_cast<float>(BH1750::GetMeasurementTimeMs());
+        lux *= measurement_time_factor;
     }
-    return BH1750::RESET_VALUE;
+    float mode_factor = MODE_FACTOR_HIGH;
+    const Mode mode = BH1750::GetMode();
+    if (mode == BH1750::Mode::CONTINUOUS_HIGH_RES_2 || mode == BH1750::Mode::ONE_TIME_HIGH_RES_2) {
+        mode_factor = MODE_FACTOR_HIGH_2;
+    } else if (mode == BH1750::Mode::CONTINUOUS_LOW_RES || mode == BH1750::Mode::ONE_TIME_LOW_RES) {
+        mode_factor = MODE_FACTOR_LOW;
+    }
+    lux *= mode_factor;
+    lux /= ACCURACY_FACTOR;
+    return lux;
 }
 
 /// TODO: remove
@@ -94,10 +82,14 @@ void test_task(void* params)
     auto i2c_1 = std::make_unique<PicoW_I2C>(sda, scl, BH1750::BAUDRATE_MAX);
     auto ALS = AmbientLightSensor(i2c_1.get(), BH1750::I2CDevAddr::ADDR_LOW);
     uint m_i = 0;
+    float measurement = 0;
     ALS.StartContinuousMeasurement();
     while (true) {
-        float measurement = ALS.ReadLuxBlocking();
-        CLIOUT("Measurement #%u: %f\n", ++m_i, measurement);
+        if (ALS.ReadLuxBlocking(&measurement)) {
+            CLIOUT("Measurement #%u: %f\n", ++m_i, measurement);
+        } else {
+            CLIOUT("Warning: Failed to receive lux measurement.");
+        }
     }
 }
 

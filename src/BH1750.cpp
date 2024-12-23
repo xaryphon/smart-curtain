@@ -14,6 +14,7 @@ void BH1750::SetMode(BH1750::Mode mode)
 {
     if (GetMode() == mode) {
         CLIOUT("Warning: Already in mode %hhu\n", mode);
+        return;
     }
     m_write_buffer[0] = mode;
     if (m_i2c->Write(m_dev_addr, m_write_buffer.data(), I2C_INSTRUCTION_BUF_LEN) != I2C_INSTRUCTION_BUF_LEN) {
@@ -29,13 +30,14 @@ BH1750::Mode BH1750::GetMode() const
     return m_mode;
 }
 
-uint16_t BH1750::ReadMeasurementData()
+bool BH1750::ReadMeasurementData(uint16_t *data)
 {
     if (m_i2c->Read(m_dev_addr, m_read_buffer.data(), I2C_MEASUREMENT_BUF_LEN) != I2C_MEASUREMENT_BUF_LEN) {
         CLIOUT("Warning: I2C measurement read failed.\n");
-        return RESET_VALUE;
+        return false;
     }
-    return static_cast<uint16_t>((m_read_buffer[0]) << 8U) | m_read_buffer[1];
+    *data = static_cast<uint16_t>((m_read_buffer[0]) << 8U) | m_read_buffer[1];
+    return true;
 }
 
 void BH1750::Reset()

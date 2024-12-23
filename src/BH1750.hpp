@@ -41,7 +41,7 @@ protected:
     explicit BH1750(PicoW_I2C* picoI2C, BH1750::I2CDevAddr i2c_dev_addr);
     void SetMode(BH1750::Mode mode);
     BH1750::Mode GetMode() const;
-    uint16_t ReadMeasurementData();
+    bool ReadMeasurementData(uint16_t *data);
     void Reset();
     bool SetMeasurementTimeMS(uint8_t measurement_time_ms);
     uint8_t GetMeasurementTimeMs() const;
