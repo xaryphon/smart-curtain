@@ -35,7 +35,7 @@ void PicoW_I2C::IRQ_I2C1()
     }
 }
 
-PicoW_I2C::PicoW_I2C(sda0_pin sda, scl0_pin scl, uint baudrate)
+PicoW_I2C::PicoW_I2C(SDA0Pin sda, SCL0Pin scl, uint baudrate)
     : m_sda(sda)
     , m_scl(scl)
     , m_irqn(I2C0_IRQ)
@@ -50,7 +50,7 @@ PicoW_I2C::PicoW_I2C(sda0_pin sda, scl0_pin scl, uint baudrate)
     Init();
 }
 
-PicoW_I2C::PicoW_I2C(sda1_pin sda, scl1_pin scl, uint baudrate)
+PicoW_I2C::PicoW_I2C(SDA1Pin sda, SCL1Pin scl, uint baudrate)
     : m_sda(sda)
     , m_scl(scl)
     , m_irqn(I2C1_IRQ)

@@ -4,13 +4,13 @@
 
 #define CLIOUT printf
 
-BH1750::BH1750(const std::shared_ptr<PicoW_I2C>& i2c, BH1750::I2C_dev_addr i2c_dev_addr)
+BH1750::BH1750(const std::shared_ptr<PicoW_I2C>& i2c, BH1750::I2CDevAddr i2c_dev_addr)
     : m_i2c(i2c)
     , m_dev_addr(i2c_dev_addr)
 {
 }
 
-void BH1750::SetMode(BH1750::mode mode)
+void BH1750::SetMode(BH1750::Mode mode)
 {
     if (GetMode() == mode) {
         CLIOUT("Warning: Already in mode %hhu\n", mode);
@@ -24,7 +24,7 @@ void BH1750::SetMode(BH1750::mode mode)
     vTaskDelay(I2C_GRACE_PERIOD_TICKS);
 }
 
-BH1750::mode BH1750::GetMode() const
+BH1750::Mode BH1750::GetMode() const
 {
     return m_mode;
 }
@@ -40,18 +40,18 @@ uint16_t BH1750::ReadMeasurementData()
 
 void BH1750::Reset()
 {
-    const mode mode = GetMode();
-    if (mode == POWER_DOWN) {
-        SetMode(POWER_ON);
+    const Mode mode = GetMode();
+    if (mode == Mode::POWER_DOWN) {
+        SetMode(Mode::POWER_ON);
     }
-    m_write_buffer[0] = RESET;
+    m_write_buffer[0] = Operation::RESET;
     if (m_i2c->Write(m_dev_addr, m_write_buffer.data(), I2C_INSTRUCTION_BUF_LEN) != I2C_INSTRUCTION_BUF_LEN) {
         CLIOUT("Warning: I2C reset write failed.\n");
         return;
     }
     vTaskDelay(I2C_GRACE_PERIOD_TICKS);
-    if (mode == POWER_DOWN) {
-        SetMode(POWER_DOWN);
+    if (mode == Mode::POWER_DOWN) {
+        SetMode(Mode::POWER_DOWN);
     }
 }
 
@@ -62,13 +62,13 @@ bool BH1750::SetMeasurementTimeMS(uint8_t measurement_time_ms)
                measurement_time_ms, MEASUREMENT_TIME_MIN, MEASUREMENT_TIME_MAX);
         return false;
     }
-    m_write_buffer[0] = operation::SET_MTREG_HIGH_BITS | static_cast<uint8_t>(measurement_time_ms & MEASUREMENT_TIME_HIGH_BITS);
+    m_write_buffer[0] = Operation::SET_MTREG_HIGH_BITS | static_cast<uint8_t>(measurement_time_ms & MEASUREMENT_TIME_HIGH_BITS);
     if (m_i2c->Write(m_dev_addr, m_write_buffer.data(), I2C_INSTRUCTION_BUF_LEN) != I2C_INSTRUCTION_BUF_LEN) {
         CLIOUT("Warning: I2C MTReg-high-bits write failed.\n");
         return false;
     }
     vTaskDelay(I2C_GRACE_PERIOD_TICKS);
-    m_write_buffer[0] = operation::SET_MTREG_LOW_BITS | static_cast<uint8_t>(measurement_time_ms & MEASUREMENT_TIME_LOW_BITS);
+    m_write_buffer[0] = Operation::SET_MTREG_LOW_BITS | static_cast<uint8_t>(measurement_time_ms & MEASUREMENT_TIME_LOW_BITS);
     if (m_i2c->Write(m_dev_addr, m_write_buffer.data(), I2C_INSTRUCTION_BUF_LEN) != I2C_INSTRUCTION_BUF_LEN) {
         CLIOUT("Warning: I2C MTReg-low-bits write failed.\n");
         return false;

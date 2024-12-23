@@ -7,7 +7,7 @@
 
 #define CLIOUT printf
 
-AmbientLightSensor::AmbientLightSensor(const std::shared_ptr<PicoW_I2C>& i2c, BH1750::I2C_dev_addr i2c_dev_addr)
+AmbientLightSensor::AmbientLightSensor(const std::shared_ptr<PicoW_I2C>& i2c, BH1750::I2CDevAddr i2c_dev_addr)
     : BH1750(i2c, i2c_dev_addr)
 {
 }
@@ -16,33 +16,33 @@ void AmbientLightSensor::StartContinuousMeasurement()
 {
     SetWaitTime();
     /// TODO: upgrade to evaluate appropriate resolution mode according to previous measurement
-    const mode new_mode = CONTINUOUS_HIGH_RES;
+    const Mode new_mode = BH1750::Mode::CONTINUOUS_HIGH_RES;
     BH1750::SetMode(new_mode);
 }
 
 void AmbientLightSensor::StopContinuousMeasurement()
 {
-    BH1750::SetMode(POWER_DOWN);
+    BH1750::SetMode(BH1750::Mode::POWER_DOWN);
 }
 
 float AmbientLightSensor::ReadLuxBlocking()
 {
     float lux = BH1750::RESET_VALUE;
     switch (BH1750::GetMode()) {
-    case POWER_DOWN:
-    case POWER_ON:
+    case BH1750::Mode::POWER_DOWN:
+    case BH1750::Mode::POWER_ON:
         /// TODO: upgrade to evaluate appropriate resolution mode according to previous measurement
         SetWaitTime();
-        SetMode(ONE_TIME_HIGH_RES);
+        SetMode(BH1750::Mode::ONE_TIME_HIGH_RES);
         vTaskDelay(m_measurement_ready_in_ticks);
         lux = Uint16ToLux(BH1750::ReadMeasurementData());
         break;
-    case CONTINUOUS_HIGH_RES:
-    case CONTINUOUS_HIGH_RES_2:
-    case CONTINUOUS_LOW_RES:
-    case ONE_TIME_HIGH_RES:
-    case ONE_TIME_HIGH_RES_2:
-    case ONE_TIME_LOW_RES:
+    case BH1750::Mode::CONTINUOUS_HIGH_RES:
+    case BH1750::Mode::CONTINUOUS_HIGH_RES_2:
+    case BH1750::Mode::CONTINUOUS_LOW_RES:
+    case BH1750::Mode::ONE_TIME_HIGH_RES:
+    case BH1750::Mode::ONE_TIME_HIGH_RES_2:
+    case BH1750::Mode::ONE_TIME_LOW_RES:
         /// TODO: upgrade to evaluate appropriate resolution mode according to previous measurement
         SetWaitTime();
         vTaskDelay(m_measurement_ready_in_ticks);
@@ -59,7 +59,7 @@ void AmbientLightSensor::SetWaitTime()
     auto wait_time = static_cast<uint32_t>(BH1750::GetMeasurementTimeMs());
     // Measurement should be waited for for a longer time
     // if measurement starts from a stagnant state.
-    if (BH1750::GetMode() == POWER_DOWN || BH1750::GetMode() == POWER_ON) {
+    if (BH1750::GetMode() == BH1750::Mode::POWER_DOWN || BH1750::GetMode() == BH1750::Mode::POWER_ON) {
         // measurement time =* 1.5
         wait_time *= 3;
         wait_time /= 2;
@@ -76,10 +76,10 @@ float AmbientLightSensor::Uint16ToLux(uint16_t u16) const
             lux *= measurement_time_factor;
         }
         float mode_factor = MODE_FACTOR_HIGH;
-        const mode mode = BH1750::GetMode();
-        if (mode == CONTINUOUS_HIGH_RES_2 || mode == ONE_TIME_HIGH_RES_2) {
+        const Mode mode = BH1750::GetMode();
+        if (mode == BH1750::Mode::CONTINUOUS_HIGH_RES_2 || mode == BH1750::Mode::ONE_TIME_HIGH_RES_2) {
             mode_factor = MODE_FACTOR_HIGH_2;
-        } else if (mode == CONTINUOUS_LOW_RES || mode == ONE_TIME_LOW_RES) {
+        } else if (mode == BH1750::Mode::CONTINUOUS_LOW_RES || mode == BH1750::Mode::ONE_TIME_LOW_RES) {
             mode_factor = MODE_FACTOR_LOW;
         }
         lux *= mode_factor;
@@ -91,10 +91,10 @@ float AmbientLightSensor::Uint16ToLux(uint16_t u16) const
 
 void test_task(void* params)
 {
-    auto sda = PicoW_I2C::sda1_pin::SDA1_26;
-    auto scl = PicoW_I2C::scl1_pin::SCL1_27;
+    auto sda = PicoW_I2C::SDA1Pin::SDA1_26;
+    auto scl = PicoW_I2C::SCL1Pin::SCL1_27;
     auto i2c_1 = std::make_shared<PicoW_I2C>(sda, scl, BH1750::BAUDRATE_MAX);
-    auto ALS = AmbientLightSensor(i2c_1, BH1750::ADDR_LOW);
+    auto ALS = AmbientLightSensor(i2c_1, BH1750::I2CDevAddr::ADDR_LOW);
     uint m_i = 0;
     ALS.StartContinuousMeasurement();
     while (true) {

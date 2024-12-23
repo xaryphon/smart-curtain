@@ -15,7 +15,7 @@
 
 class PicoW_I2C {
 public:
-    enum sda0_pin {
+    enum SDA0Pin : uint {
         SDA0_0 = 0,
         SDA0_4 = 4,
         SDA0_8 = 8,
@@ -24,7 +24,7 @@ public:
         SDA0_20 = 20,
     };
 
-    enum scl0_pin {
+    enum SCL0Pin : uint {
         SCL0_1 = 1,
         SCL0_5 = 5,
         SCL0_9 = 9,
@@ -33,26 +33,26 @@ public:
         SCL0_21 = 21,
     };
 
-    enum sda1_pin {
+    enum SDA1Pin : uint {
         SDA1_2 = 2,
         SDA1_6 = 6,
         SDA1_10 = 10,
         SDA1_14 = 14,
         SDA1_18 = 18,
-        SDA1_26 = 26
+        SDA1_26 = 26,
     };
 
-    enum scl1_pin {
+    enum SCL1Pin : uint {
         SCL1_3 = 3,
         SCL1_7 = 7,
         SCL1_11 = 11,
         SCL1_15 = 15,
         SCL1_19 = 19,
-        SCL1_27 = 27
+        SCL1_27 = 27,
     };
 
-    explicit PicoW_I2C(sda0_pin sda, scl0_pin scl, uint baudrate);
-    explicit PicoW_I2C(sda1_pin sda, scl1_pin scl, uint baudrate);
+    explicit PicoW_I2C(SDA0Pin sda, SCL0Pin scl, uint baudrate);
+    explicit PicoW_I2C(SDA1Pin sda, SCL1Pin scl, uint baudrate);
     void Init();
     PicoW_I2C(const PicoW_I2C&) = delete;
     uint Write(uint8_t addr, const uint8_t* buffer, uint length);
@@ -68,7 +68,7 @@ private:
     uint m_baudrate;
     TaskHandle_t m_task_to_notify = nullptr;
     Fmutex m_access;
-    uint8_t* m_wbuf = nullptr;
+    const uint8_t* m_wbuf = nullptr;
     uint m_wctr = 0;
     uint8_t* m_rbuf = nullptr;
     uint m_rctr = 0;
