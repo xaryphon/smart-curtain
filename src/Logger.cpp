@@ -94,23 +94,21 @@ void Logger::Task()
 /// TODO: with real time, perhaps date or day of the weak
 std::string Logger::FormatTime(uint64_t time)
 {
-    enum {
+    enum : uint64_t {
         us_in_ms = 1000,
         ms_in_s = 1000,
         s_in_m = 60,
+        ms_in_m = ms_in_s * s_in_m,
         m_in_h = 60,
+        ms_in_h = ms_in_m * m_in_h,
         h_in_d = 24
     };
 
-    static constexpr int64_t s_per_ms = ms_in_s;
-    static constexpr int64_t m_per_ms = s_per_ms * s_in_m;
-    static constexpr int64_t h_per_ms = m_per_ms * m_in_h;
-
     time /= us_in_ms;
     return fmt::format("{:0>2}:{:0>2}:{:0>2}:{:0>3}",
-        time / h_per_ms % h_in_d,
-        time / m_per_ms % m_in_h,
-        time / s_per_ms % s_in_m,
+        time / ms_in_h % h_in_d,
+        time / ms_in_m % m_in_h,
+        time / ms_in_s % s_in_m,
         time % ms_in_s);
 }
 
