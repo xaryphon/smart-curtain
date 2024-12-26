@@ -5,10 +5,16 @@
 
 
 /// TODO: classify queue
-QueueHandle_t Logger::m_syslog_q = xQueueCreate(10, sizeof(log_content*));
+QueueHandle_t Logger::m_syslog_q;
 /// TODO: classify mutex
-SemaphoreHandle_t Logger::m_mutex = xSemaphoreCreateMutex();
+SemaphoreHandle_t Logger::m_mutex;
 uint32_t Logger::m_lost_logs = 0;
+
+void Logger::Initialize()
+{
+    m_syslog_q = xQueueCreate(SYSLOG_QUEUE_LENGTH, sizeof(log_content*));
+    m_mutex = xSemaphoreCreateMutex();
+}
 
 Logger::Logger(const char* task_name, uint32_t stack_depth, UBaseType_t priority)
 {

@@ -17,6 +17,7 @@ uint32_t read_runtime_ctr(void)
 int main()
 {
     assert(stdio_init_all());
+    Logger::Initialize();
     Logger::Log("Boot");
 
     auto example = Example::create();

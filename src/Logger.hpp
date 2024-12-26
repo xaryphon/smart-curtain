@@ -15,6 +15,7 @@
 
 class Logger {
 public:
+    static void Initialize();
     explicit Logger(const char* task_name, uint32_t stack_depth, UBaseType_t priority);
 
     template <typename... T>
@@ -50,6 +51,7 @@ private:
     void Task();
     static std::string FormatTime(uint64_t time_us);
 
+    static constexpr UBaseType_t SYSLOG_QUEUE_LENGTH = 10;
     TaskHandle_t m_task_handle { nullptr };
     static QueueHandle_t m_syslog_q;
     static SemaphoreHandle_t m_mutex;
