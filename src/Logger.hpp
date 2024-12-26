@@ -21,20 +21,7 @@ public:
     template <typename... T>
     static void Log(fmt::format_string<T...> fmt, T&&... args)
     {
-        xSemaphoreTake(m_mutex, portMAX_DELAY);
-
-        auto* log = new Logger::log_content {
-            /// TODO: real time
-            .timestamp = time_us_64(),
-            .task_name = GetTaskName(),
-            .msg = fmt::vformat(fmt, fmt::make_format_args(args...))
-        };
-
-        if (xQueueSendToBack(m_syslog_q, &log, 0) != pdTRUE) {
-            delete log;
-            ++Logger::m_lost_logs;
-        }
-        xSemaphoreGive(m_mutex);
+        LogToQueue(fmt::vformat(fmt, fmt::make_format_args(args...)));
     }
 
     struct log_content {
@@ -44,6 +31,7 @@ public:
     };
 
 private:
+    static void LogToQueue(std::string str);
     static const char* GetTaskName();
     void Task();
     static std::string FormatTime(uint64_t time_us);

@@ -1,8 +1,8 @@
 #include "Logger.hpp"
 
 #include <utility>
-#include "config.h"
 
+#include "config.h"
 
 /// TODO: classify queue
 QueueHandle_t Logger::m_syslog_q;
@@ -30,6 +30,24 @@ Logger::Logger(const char* task_name, uint32_t stack_depth, UBaseType_t priority
     } else {
         Logger::Log("Error: Failed to create task [{}]", task_name);
     }
+}
+
+void Logger::LogToQueue(std::string str)
+{
+    xSemaphoreTake(m_mutex, portMAX_DELAY);
+
+    auto* log = new Logger::log_content {
+        /// TODO: real time
+        .timestamp = time_us_64(),
+        .task_name = GetTaskName(),
+        .msg = std::move(str)
+    };
+
+    if (xQueueSendToBack(m_syslog_q, &log, 0) != pdTRUE) {
+        delete log;
+        ++Logger::m_lost_logs;
+    }
+    xSemaphoreGive(m_mutex);
 }
 
 const char* Logger::GetTaskName()
