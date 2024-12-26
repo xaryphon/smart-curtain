@@ -84,7 +84,9 @@ void Logger::Task()
         }
         if (m_lost_logs > 0) {
             Logger::Log("Warning: lost {} logs.", m_lost_logs);
+            xSemaphoreTake(m_mutex, portMAX_DELAY);
             Logger::m_lost_logs = 0;
+            xSemaphoreGive(m_mutex);
         }
     }
 }
