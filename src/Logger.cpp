@@ -1,8 +1,8 @@
 #include "Logger.hpp"
 
 #include <utility>
+#include "config.h"
 
-#define TASK_KONDOM(klass, func) [](void* param) -> void { static_cast<klass*>(param)->func(); }
 
 /// TODO: classify queue
 QueueHandle_t Logger::m_syslog_q = xQueueCreate(10, sizeof(log_content*));
