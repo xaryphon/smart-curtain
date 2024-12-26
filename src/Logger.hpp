@@ -21,10 +21,7 @@ public:
     template <typename... T>
     static void Log(fmt::format_string<T...> fmt, T&&... args)
     {
-        if (xSemaphoreTake(m_mutex, LOG_BLOCK_TIME_TICKS) == pdFALSE) {
-            ++Logger::m_lost_logs;
-            return;
-        }
+        xSemaphoreTake(m_mutex, portMAX_DELAY);
 
         auto* log = new Logger::log_content {
             /// TODO: real time
@@ -37,7 +34,7 @@ public:
             delete log;
             ++Logger::m_lost_logs;
         }
-        assert(xSemaphoreGive(m_mutex));
+        xSemaphoreGive(m_mutex);
     }
 
     struct log_content {
