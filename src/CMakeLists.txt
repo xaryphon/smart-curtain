@@ -4,5 +4,6 @@ target_sources(${PROJECT_NAME} PRIVATE
     example.cpp
     Fmutex.cpp
     main.cpp
+    Motor.cpp
     PicoW_I2C.cpp
 )
