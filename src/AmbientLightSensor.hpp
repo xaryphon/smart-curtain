@@ -1,0 +1,26 @@
+#pragma once
+
+#include <memory>
+
+#include "BH1750.hpp"
+#include "PicoW_I2C.h"
+
+class AmbientLightSensor : private BH1750 {
+public:
+    explicit AmbientLightSensor(PicoW_I2C* i2c, BH1750::I2CDevAddr i2c_dev_addr);
+    void StartContinuousMeasurement();
+    void StopContinuousMeasurement();
+    bool ReadLuxBlocking(float *lux);
+
+private:
+    TickType_t GetMediatedTimeTicks() const;
+    float Uint16ToLux(uint16_t u16) const;
+
+    static constexpr uint8_t MEASUREMENT_TIME_TYPICAL_MS = 120;
+
+    TickType_t m_measurement_ready_in_ticks = 0;
+    uint16_t m_measurement_data = BH1750::RESET_VALUE;
+    float m_previous_measurement = static_cast<float>(BH1750::RESET_VALUE);
+};
+
+void test_ALS();
