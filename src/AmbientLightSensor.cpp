@@ -89,20 +89,29 @@ void test_task(void* params)
     auto ALS = AmbientLightSensor(i2c_1.get(), BH1750::I2CDevAddr::ADDR_LOW);
     uint m_i = 0;
     float measurement = 0;
-    uint64_t start = time_us_64();
-    ALS.ReadLuxBlocking(&measurement);
-    uint64_t stop = time_us_64();
-    CLIOUT("Measurement #%u: %f in %llu us ; should be ~ %d ms\n", ++m_i, measurement, stop - start, 69 + 69 / 2);
-    ALS.StartContinuousMeasurement();
-    start = time_us_64();
+    const int cont_reads = 10;
     while (true) {
-        if (ALS.ReadLuxBlocking(&measurement)) {
-            stop = time_us_64();
-            CLIOUT("Measurement #%u: %f in %llu us ; should be ~ %d ms\n", ++m_i, measurement, stop - start, 69);
-            start = stop;
-        } else {
-            CLIOUT("Warning: Failed to receive lux measurement.");
+
+        uint64_t start = time_us_64();
+        ALS.ReadLuxBlocking(&measurement);
+        uint64_t stop = time_us_64();
+        CLIOUT("One time read #%u: %f in %llu us ; should be ~ %d ms\n", ++m_i, measurement, stop - start, 69 + 69 / 2);
+
+        ALS.StartContinuousMeasurement();
+        start = time_us_64();
+
+        CLIOUT("%d continuous reads\n", cont_reads);
+        for (int cont_read_i = 0; cont_read_i < cont_reads; ++cont_read_i) {
+            if (ALS.ReadLuxBlocking(&measurement)) {
+                stop = time_us_64();
+                CLIOUT("Cont read #%u: %f in %llu us ; should be ~ %d ms\n", ++m_i, measurement, stop - start, 69);
+                start = stop;
+            } else {
+                CLIOUT("Warning: Failed to receive lux measurement.\n");
+            }
         }
+
+        ALS.StopContinuousMeasurement();
     }
 }
 
