@@ -37,6 +37,11 @@ bool BH1750::ReadMeasurementData(uint16_t *data)
         return false;
     }
     *data = static_cast<uint16_t>((m_read_buffer[0]) << 8U) | m_read_buffer[1];
+    if (m_mode == Mode::ONE_TIME_HIGH_RES ||
+        m_mode == Mode::ONE_TIME_HIGH_RES_2 ||
+        m_mode == Mode::ONE_TIME_LOW_RES) {
+        m_mode = Mode::POWER_DOWN;
+    }
     return true;
 }
 
