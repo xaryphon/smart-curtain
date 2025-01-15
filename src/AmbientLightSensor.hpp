@@ -13,13 +13,14 @@ public:
     bool ReadLuxBlocking(float *lux);
 
 private:
-    TickType_t GetMediatedTimeTicks() const;
+    void MediateMeasurementTime();
+    TickType_t GetMeasurementTimeTicks() const;
     float Uint16ToLux(uint16_t u16) const;
 
     static constexpr uint8_t MEASUREMENT_TIME_TYPICAL_MS = 120;
 
     TickType_t m_measurement_ready_in_ticks = 0;
-    uint16_t m_measurement_data = BH1750::RESET_VALUE;
+    TickType_t m_measurement_started_at_ticks = 0;
     float m_previous_measurement = static_cast<float>(BH1750::RESET_VALUE);
 };
 

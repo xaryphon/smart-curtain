@@ -18,7 +18,7 @@ void AmbientLightSensor::StartContinuousMeasurement()
     const BH1750::Mode current_mode = BH1750::GetMode();
     BH1750::SetMode(BH1750::Mode::CONTINUOUS_HIGH_RES);
     if (current_mode == BH1750::Mode::POWER_DOWN || current_mode == BH1750::Mode::POWER_ON) {
-        m_measurement_ready_in_ticks = GetMediatedTimeTicks();
+        MediateMeasurementTime();
     }
 }
 
@@ -33,15 +33,15 @@ bool AmbientLightSensor::ReadLuxBlocking(float* lux)
     const BH1750::Mode current_mode = BH1750::GetMode();
     if (current_mode == BH1750::Mode::POWER_DOWN || current_mode == BH1750::Mode::POWER_ON) {
         SetMode(BH1750::Mode::ONE_TIME_HIGH_RES);
-        m_measurement_ready_in_ticks = GetMediatedTimeTicks();
+        MediateMeasurementTime();
     }
-    if (!ReadMeasurementData(&m_measurement_data)) {
-        CLIOUT("Warning: Failed to read indoor/outdoor sensor.");
+    uint16_t measurement_data = BH1750::RESET_VALUE;
+    if (!BH1750::ReadMeasurementData(&measurement_data)) {
+        CLIOUT("Warning: Failed to read indoor/outdoor sensor.\n");
         return false;
     }
-    vTaskDelay(m_measurement_ready_in_ticks);
-    m_measurement_ready_in_ticks = pdMS_TO_TICKS(BH1750::GetMeasurementTimeMs());
-    *lux = Uint16ToLux(m_measurement_data);
+    xTaskDelayUntil(&m_measurement_started_at_ticks, GetMeasurementTimeTicks());
+    *lux = Uint16ToLux(measurement_data);
     return true;
 }
 
@@ -50,9 +50,15 @@ bool AmbientLightSensor::ReadLuxBlocking(float* lux)
  * The safest wait time is in the middle of the expected write time for this read and the expected write time for a potential next read,
  * as in: (x1 + x2) / 2 = 1.5 x set measurement time
  */
-TickType_t AmbientLightSensor::GetMediatedTimeTicks() const
+void AmbientLightSensor::MediateMeasurementTime()
 {
-    return pdMS_TO_TICKS(static_cast<uint32_t>(BH1750::GetMeasurementTimeMs()) * 3 / 2);
+    vTaskDelay(GetMeasurementTimeTicks() / 2);
+    m_measurement_started_at_ticks = xTaskGetTickCount();
+}
+
+TickType_t AmbientLightSensor::GetMeasurementTimeTicks() const
+{
+    return pdMS_TO_TICKS(BH1750::GetMeasurementTimeMs());
 }
 
 float AmbientLightSensor::Uint16ToLux(uint16_t u16) const
@@ -83,10 +89,17 @@ void test_task(void* params)
     auto ALS = AmbientLightSensor(i2c_1.get(), BH1750::I2CDevAddr::ADDR_LOW);
     uint m_i = 0;
     float measurement = 0;
+    uint64_t start = time_us_64();
+    ALS.ReadLuxBlocking(&measurement);
+    uint64_t stop = time_us_64();
+    CLIOUT("Measurement #%u: %f in %llu us ; should be ~ %d ms\n", ++m_i, measurement, stop - start, 69 + 69 / 2);
     ALS.StartContinuousMeasurement();
+    start = time_us_64();
     while (true) {
         if (ALS.ReadLuxBlocking(&measurement)) {
-            CLIOUT("Measurement #%u: %f\n", ++m_i, measurement);
+            stop = time_us_64();
+            CLIOUT("Measurement #%u: %f in %llu us ; should be ~ %d ms\n", ++m_i, measurement, stop - start, 69);
+            start = stop;
         } else {
             CLIOUT("Warning: Failed to receive lux measurement.");
         }
@@ -96,6 +109,14 @@ void test_task(void* params)
 /// TODO: remove
 void test_ALS()
 {
+    // Issue: Delaying a task for less than 100 ms before the RP2040 has ran some small amount of time.
+    // Solution: Sleeping for 1 us before calling vTaskDelay resolves this issue.
+    // Theory: *Maybe* TaskDelay does some math internally that requires the hardware timer to be big enough to proceed
+    //         and simply returns without delaying if hardware timer < 0 us at the moment.
+    //         This is how it seems to behave.
+    sleep_us(1);
+    /// TODO: if this is the case, this should be done not just for ALS but for all tasks and thus by some dedicated operation.
+
     xTaskCreate(test_task,
         "ALS",
         DEFAULT_TASK_STACK_SIZE,
