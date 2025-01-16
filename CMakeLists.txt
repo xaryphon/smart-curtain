@@ -15,35 +15,36 @@ add_executable(${PROJECT_NAME})
 add_subdirectory(src)
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
-        COMPILE_FLAGS "-Wall -Werror"
+    COMPILE_FLAGS "-Wall -Werror"
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE
-        src
+    src
 )
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE
-        WIFI_SSID=\"$ENV{WIFI_SSID}\"
-        WIFI_PASSWORD=\"$ENV{WIFI_PASSWORD}\"
-        NO_SYS=0            # don't want NO_SYS (generally this would be in your lwipopts.h)
-        PICO_CYW43_ARCH_DEFAULT_COUNTRY_CODE=CYW43_COUNTRY_FINLAND
+    WIFI_SSID=\"$ENV{WIFI_SSID}\"
+    WIFI_PASSWORD=\"$ENV{WIFI_PASSWORD}\"
+    NO_SYS=0            # don't want NO_SYS (generally this would be in your lwipopts.h)
+    PICO_CYW43_ARCH_DEFAULT_COUNTRY_CODE=CYW43_COUNTRY_FINLAND
 )
 
 target_link_libraries(${PROJECT_NAME}
-        pico_stdlib
-        hardware_i2c
-        hardware_adc
-        FreeRTOS-Kernel-Heap4
-        pico_cyw43_arch_lwip_sys_freertos
-        pico_lwip_mbedtls
-        pico_mbedtls
+    fmt::fmt
+    FreeRTOS-Kernel-Heap4
+    hardware_i2c
+    hardware_adc
+    pico_cyw43_arch_lwip_sys_freertos
+    pico_lwip_mbedtls
+    pico_mbedtls
+    pico_stdlib
 )
 
 # Ignore warnings from lwip code
 set_source_files_properties(
-        ${PICO_LWIP_PATH}/src/apps/altcp_tls/altcp_tls_mbedtls.c
-        PROPERTIES
-        COMPILE_OPTIONS "-Wno-unused-result"
+    ${PICO_LWIP_PATH}/src/apps/altcp_tls/altcp_tls_mbedtls.c
+    PROPERTIES
+    COMPILE_OPTIONS "-Wno-unused-result"
 )
 
 pico_add_uf2_output(${PROJECT_NAME})
