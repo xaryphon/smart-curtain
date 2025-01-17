@@ -12,41 +12,126 @@ AmbientLightSensor::AmbientLightSensor(PicoW_I2C* i2c, BH1750::I2CDevAddr i2c_de
 {
 }
 
-void AmbientLightSensor::StartContinuousMeasurement()
-{
-    AdjustMeasurementSettings(AmbientLightSensor::CONTINUOUS);
-}
-
-void AmbientLightSensor::StopContinuousMeasurement()
-{
-    BH1750::SetMode(BH1750::Mode::POWER_DOWN);
-}
-
 bool AmbientLightSensor::ReadLuxBlocking(float* lux)
 {
     switch (BH1750::GetMode()) {
     case POWER_DOWN:
     case POWER_ON:
-    case ONE_TIME_HIGH_RES:
-    case ONE_TIME_HIGH_RES_2:
-    case ONE_TIME_LOW_RES:
+    case ONE_TIME_MEDIUM:
+    case ONE_TIME_HIGH:
+    case ONE_TIME_LOW:
         AdjustMeasurementSettings(MeasurementType::ONE_TIME);
         break;
-    case CONTINUOUS_HIGH_RES:
-    case CONTINUOUS_HIGH_RES_2:
-    case CONTINUOUS_LOW_RES:
+    case CONTINUOUS_MEDIUM:
+    case CONTINUOUS_HIGH:
+    case CONTINUOUS_LOW:
         AdjustMeasurementSettings(MeasurementType::CONTINUOUS);
         break;
     }
+    WaitForMeasurement();
     uint16_t measurement_data = BH1750::RESET_VALUE;
     if (!BH1750::ReadMeasurementData(&measurement_data)) {
         CLIOUT("Warning: Failed to read indoor/outdoor sensor.\n");
         return false;
     }
-    xTaskDelayUntil(&m_measurement_started_at_ticks, GetMeasurementTimeTicks());
     *lux = Uint16ToLux(measurement_data);
     m_previous_measurement = *lux;
     return true;
+}
+
+/* BH1750 Datasheets:
+ * Min detectable lux:       0.11 lux (presumably with HIGH_RES_2)
+ * Max detectable lux: 100 000    lux (presumably with LOW_RES)
+ *
+ * Mathematical maximums with default measurement time reference:
+ * HIGH_RES_2: 0b 1111 1111 1111 1111 / 1.2 * 0.5 =  27306,25 lu
+ * HIGH_RES  : 0b 1111 1111 1111 1111 / 1.2       =  54612,5  lux
+ * LOW_RES   : 0b 1111 1111 1111 1111 / 1.2 * 4   = 218450    lux
+ *
+ * Expected LOW_RES max, according to datasheets:
+ * ~ 100 000 lux / 4 / 1.2 = ~ 20833 = 0b 0101 0001 0110 0001 u16
+ *
+ * If this u16 is a physical limitation of the ADC or some other part of the measuring instrument:
+ * Expected HIGH_RES_2 max:
+ * 0b 0101 0001 0110 0001 / 1.2 * 0.5 =  8680,4166... lux
+ * Expected HIGH_RES max:
+ * 0b 0101 0001 0110 0001 / 1.2       = 17360,833...  lux
+ *
+ * The measurement ought to be adjusted earlier rather than later,
+ * as the three resolutions offer quite a bit of overlap.
+ * Divide these expected maximums to half:
+ * HIGH_2_UPPER_LIMIT =  8680,4166... / 2 = 4340,20833... lux
+ * HIGH_UPPER_LIMIT   = 17360,833...  / 2 = 8680,4166...  lux
+ *
+ * (dark)   HIGH_2:   0 < prev_measurement < ~4340
+ * (medium) HIGH: ~4340 < prev_measurement < ~8680
+ * (bright) LOW:  ~8680 < prev_measurement
+ */
+void AmbientLightSensor::AdjustMeasurementSettings(AmbientLightSensor::MeasurementType measurement_type)
+{
+    static const uint16_t EXPECTED_MAX_RAW_READ = 0b0101000101100001;
+    static const auto ACCURACY_FACTOR = static_cast<float>(BH1750::ACCURACY_FACTOR);
+    static const auto MODE_FACTOR_HIGH = static_cast<float>(BH1750::MODE_FACTOR_HIGH);
+    static const auto MODE_FACTOR_MEDIUM = static_cast<float>(BH1750::MODE_FACTOR_MEDIUM);
+
+    static const float MAX_HIGH = EXPECTED_MAX_RAW_READ / ACCURACY_FACTOR * MODE_FACTOR_HIGH / 2;
+    static const float MAX_MEDIUM = EXPECTED_MAX_RAW_READ / ACCURACY_FACTOR * MODE_FACTOR_MEDIUM / 2;
+
+    m_resolution = MeasurementResolution::LOW;
+    if (m_previous_measurement < MAX_HIGH) {
+        m_resolution = MeasurementResolution::HIGH;
+    } else if (m_previous_measurement < MAX_MEDIUM) {
+        m_resolution = MeasurementResolution::MEDIUM;
+    }
+    const auto new_mode = static_cast<BH1750::Mode>(measurement_type | m_resolution);
+    switch (new_mode) {
+    case BH1750::Mode::CONTINUOUS_MEDIUM:
+    case BH1750::Mode::CONTINUOUS_HIGH:
+    case BH1750::Mode::CONTINUOUS_LOW:
+    case BH1750::Mode::ONE_TIME_MEDIUM:
+    case BH1750::Mode::ONE_TIME_HIGH:
+    case BH1750::Mode::ONE_TIME_LOW:
+        break;
+    default:
+        CLIOUT("Error: Mode command %hhu | %hhu unfit for measuring\n", measurement_type, m_resolution);
+        return;
+    }
+    const BH1750::Mode prev_mode = BH1750::GetMode();
+    if (!BH1750::SetMode(new_mode)) {
+        CLIOUT("Warning: Failed to set ALS mode to %hhu\n", new_mode);
+        return;
+    }
+    if (prev_mode == BH1750::Mode::POWER_DOWN || prev_mode == BH1750::Mode::POWER_ON) {
+        MediateMeasurementTime();
+    }
+}
+
+void AmbientLightSensor::WaitForMeasurement()
+{
+    const TickType_t now = xTaskGetTickCount();
+    if (m_measurement_started_at_ticks > now) {
+        vTaskDelay(m_measurement_started_at_ticks - xTaskGetTickCount());
+    }
+    xTaskDelayUntil(&m_measurement_started_at_ticks, GetMeasurementTimeTicks());
+}
+
+float AmbientLightSensor::Uint16ToLux(uint16_t u16) const
+{
+    auto lux = static_cast<float>(u16);
+    if (BH1750::GetMeasurementTimeReferenceMs() != BH1750::MEASUREMENT_TIME_REFERENCE_DEFAULT_MS) {
+        const float measurement_time_factor = MEASUREMENT_TIME_REFERENCE_DEFAULT_FLOAT / static_cast<float>(BH1750::GetMeasurementTimeReferenceMs());
+        lux *= measurement_time_factor;
+    }
+    float mode_factor = MODE_FACTOR_MEDIUM;
+    const Mode mode = BH1750::GetMode();
+    if (mode == BH1750::Mode::CONTINUOUS_HIGH || mode == BH1750::Mode::ONE_TIME_HIGH) {
+        mode_factor = MODE_FACTOR_HIGH;
+    } else if (mode == BH1750::Mode::CONTINUOUS_LOW || mode == BH1750::Mode::ONE_TIME_LOW) {
+        mode_factor = MODE_FACTOR_LOW;
+    }
+    lux *= mode_factor;
+    lux /= ACCURACY_FACTOR;
+    return lux;
 }
 
 /* Measurement should be waited for for a longer time
@@ -59,112 +144,41 @@ bool AmbientLightSensor::ReadLuxBlocking(float* lux)
  */
 void AmbientLightSensor::MediateMeasurementTime()
 {
-    vTaskDelay(GetMeasurementTimeTicks() / 2);
-    m_measurement_started_at_ticks = xTaskGetTickCount();
+    m_measurement_started_at_ticks = xTaskGetTickCount() + GetMeasurementTimeTicks() / 2;
 }
 
 TickType_t AmbientLightSensor::GetMeasurementTimeTicks() const
 {
-    return pdMS_TO_TICKS(BH1750::GetMeasurementTimeMs());
-}
-
-float AmbientLightSensor::Uint16ToLux(uint16_t u16) const
-{
-    auto lux = static_cast<float>(u16);
-    if (BH1750::GetMeasurementTimeMs() != BH1750::MEASUREMENT_TIME_DEFAULT) {
-        const float measurement_time_factor = MEASUREMENT_TIME_DEFAULT / static_cast<float>(BH1750::GetMeasurementTimeMs());
-        lux *= measurement_time_factor;
-    }
-    float mode_factor = MODE_FACTOR_HIGH;
-    const Mode mode = BH1750::GetMode();
-    if (mode == BH1750::Mode::CONTINUOUS_HIGH_RES_2 || mode == BH1750::Mode::ONE_TIME_HIGH_RES_2) {
-        mode_factor = MODE_FACTOR_HIGH_2;
-    } else if (mode == BH1750::Mode::CONTINUOUS_LOW_RES || mode == BH1750::Mode::ONE_TIME_LOW_RES) {
-        mode_factor = MODE_FACTOR_LOW;
-    }
-    lux *= mode_factor;
-    lux /= ACCURACY_FACTOR;
-    return lux;
-}
-
-/* BH1750 Datasheets:
- * Min detectable lux:       0.11 lux (presumably with HIGH_RES_2)
- * Max detectable lux: 100 000    lux (presumably with LOW_RES)
- *
- * Mathematical Maximums
- * HIGH_RES_2: 0b 1111 1111 1111 1111 / 1.2 * (69 / 120) * 0.5 =  15701,09375
- * HIGH_RES  : 0b 1111 1111 1111 1111 / 1.2 * (69 / 120)       =  31402,1875
- * LOW_RES   : 0b 1111 1111 1111 1111 / 1.2 * (69 / 16)  * 4   = 942065,625
- *
- * Expected LOW_RES max:
- * 100 000 lux / 4 / (69 / 16) * 1.2 = ~ 0b 0001 1011 0010 1100
- *
- * Thus, with that same u16,
- * Expected HIGH_RES max:
- * 0b 0001 1011 0010 1100 / 1.2 * (69 / 120)       = 3333,0833...
- * Expected HIGH_RES_2 max:
- * 0b 0001 1011 0010 1100 / 1.2 * (69 / 120) * 0.5 = 1666,54166...
- *
- * The measurement ought to be adjusted early enough, so I propose we divide these "maximums" to half:
- * HIGH_RES_2 (dark) for when
- *                 previous measurement < 1666,54166... / 2 ==  833,270833...
- * HIGH_RES (medium) for when
- * 833,270833... < previous measurement < 3333,0833...  / 2 == 1666,54166...
- * LOW_RES  (bright) for when
- * 1666,54166... < previous measurement
- */
-void AmbientLightSensor::AdjustMeasurementSettings(AmbientLightSensor::MeasurementType measurement_type)
-{
-    static const uint16_t EXPECTED_MAX_RAW_READ = 0b0001101100101100;
-    static const auto ACCURACY_FACTOR = static_cast<float>(BH1750::ACCURACY_FACTOR);
-    static const auto MT_TYP_HIGH_2 = static_cast<float>(MEASUREMENT_TIME_TYPICAL_MS_HIGH_RES_2);
-    static const auto MT_TYP_HIGH = static_cast<float>(MEASUREMENT_TIME_TYPICAL_MS_HIGH_RES);
-    static const auto MODE_FACTOR_HIGH_2 = static_cast<float>(BH1750::MODE_FACTOR_HIGH_2);
-    static const auto MODE_FACTOR_HIGH = static_cast<float>(BH1750::MODE_FACTOR_HIGH);
-
-    static const float MAX_HIGH_2 = EXPECTED_MAX_RAW_READ / ACCURACY_FACTOR * (MEASUREMENT_TIME_DEFAULT / MT_TYP_HIGH_2) * MODE_FACTOR_HIGH_2 / 2;
-    static const float MAX_HIGH = EXPECTED_MAX_RAW_READ / ACCURACY_FACTOR * (MEASUREMENT_TIME_DEFAULT / MT_TYP_HIGH) * MODE_FACTOR_HIGH / 2;
-
-    MeasurementResolution new_resolution = MeasurementResolution::LOW;
-    uint8_t new_measurement_time = MEASUREMENT_TIME_TYPICAL_MS_LOW_RES;
-    if (m_previous_measurement < MAX_HIGH_2) {
-        new_resolution = MeasurementResolution::HIGH_2;
-        new_measurement_time = MEASUREMENT_TIME_TYPICAL_MS_HIGH_RES_2;
-    } else if (m_previous_measurement < MAX_HIGH) {
-        new_resolution = MeasurementResolution::HIGH;
-        new_measurement_time = MEASUREMENT_TIME_TYPICAL_MS_HIGH_RES;
-    }
-    const auto new_mode = static_cast<BH1750::Mode>(measurement_type | new_resolution);
-    switch (new_mode) {
-    case BH1750::Mode::CONTINUOUS_HIGH_RES:
-    case BH1750::Mode::CONTINUOUS_HIGH_RES_2:
-    case BH1750::Mode::CONTINUOUS_LOW_RES:
-    case BH1750::Mode::ONE_TIME_HIGH_RES:
-    case BH1750::Mode::ONE_TIME_HIGH_RES_2:
-    case BH1750::Mode::ONE_TIME_LOW_RES:
-        break;
+    const float measurement_time_factor = MEASUREMENT_TIME_REFERENCE_DEFAULT_FLOAT / static_cast<float>(BH1750::GetMeasurementTimeReferenceMs());
+    switch (m_resolution) {
+    case MEDIUM:
+        return static_cast<TickType_t>(MEASUREMENT_TIME_TYPICAL_TICKS_RES_MEDIUM * measurement_time_factor);
+    case HIGH:
+        return static_cast<TickType_t>(MEASUREMENT_TIME_TYPICAL_TICKS_RES_HIGH * measurement_time_factor);
+    case LOW:
+        return static_cast<TickType_t>(MEASUREMENT_TIME_TYPICAL_TICKS_RES_LOW * measurement_time_factor);
     default:
-        CLIOUT("Error: Mode command %hhu | %hhu unfit for measuring\n", measurement_type, new_resolution);
-        return;
+        return static_cast<TickType_t>(MEASUREMENT_TIME_TYPICAL_TICKS_RES_MEDIUM * measurement_time_factor);
     }
-    const BH1750::Mode prev_mode = BH1750::GetMode();
-    if (!BH1750::SetMode(new_mode)) {
-        CLIOUT("Warning: Failed to set ALS mode to %hhu\n", new_mode);
-        return;
-    }
-    if (!BH1750::SetMeasurementTimeMS(new_measurement_time)) {
-        CLIOUT("Warning: Failed to adjust measurement time to %hhu\n", new_measurement_time);
-        return;
-    }
-    if (prev_mode == BH1750::Mode::POWER_DOWN ||
-        prev_mode == BH1750::Mode::POWER_ON) {
-        MediateMeasurementTime();
+}
+
+void AmbientLightSensor::StartContinuousMeasurement()
+{
+    AdjustMeasurementSettings(AmbientLightSensor::CONTINUOUS);
+}
+
+void AmbientLightSensor::StopContinuousMeasurement()
+{
+    if (!BH1750::SetMode(BH1750::Mode::POWER_DOWN)) {
+        CLIOUT("Warning: Failed to stop continuous measurement mode\n");
     }
 }
 
 void AmbientLightSensor::ResetMeasurement()
 {
-    BH1750::Reset();
+    if (!BH1750::Reset()) {
+        CLIOUT("Warning: Failed to reset measurement\n");
+    }
 }
 
 /// TODO: remove

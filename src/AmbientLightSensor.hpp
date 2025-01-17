@@ -8,9 +8,9 @@
 class AmbientLightSensor : private BH1750 {
 public:
     explicit AmbientLightSensor(PicoW_I2C* i2c, BH1750::I2CDevAddr i2c_dev_addr);
+    bool ReadLuxBlocking(float* lux);
     void StartContinuousMeasurement();
     void StopContinuousMeasurement();
-    bool ReadLuxBlocking(float* lux);
     void ResetMeasurement();
 
 private:
@@ -22,28 +22,34 @@ private:
         // clang-format on
     };
 
+    // Resolution nomenclature:
+    // Datasheet = Translation
+    //    HIGH_2 = HIGH
+    //      HIGH = MEDIUM
+    //       LOW = LOW
     enum MeasurementResolution : uint8_t {
         // clang-format off
-        HIGH   = 0b00000000,
-        HIGH_2 = 0b00000001,
+        MEDIUM = 0b00000000,
+        HIGH   = 0b00000001,
         LOW    = 0b00000011,
         // clang-format on
     };
 
-    void MediateMeasurementTime();
-    TickType_t GetMeasurementTimeTicks() const;
-    float Uint16ToLux(uint16_t u16) const;
     void AdjustMeasurementSettings(AmbientLightSensor::MeasurementType measurement_type);
+    void MediateMeasurementTime();
+    void WaitForMeasurement();
+    float Uint16ToLux(uint16_t u16) const;
+    TickType_t GetMeasurementTimeTicks() const;
 
-    static constexpr uint8_t MEASUREMENT_TIME_TYPICAL_MS_HIGH_RES = 120;
-    static constexpr uint8_t MEASUREMENT_TIME_TYPICAL_MS_HIGH_RES_2 = 120;
-    static constexpr uint8_t MEASUREMENT_TIME_TYPICAL_MS_LOW_RES = 16;
+    static constexpr TickType_t MEASUREMENT_TIME_TYPICAL_TICKS_RES_MEDIUM = pdMS_TO_TICKS(MEASUREMENT_TIME_TYPICAL_RES_MEDIUM_MS);
+    static constexpr TickType_t MEASUREMENT_TIME_TYPICAL_TICKS_RES_HIGH = pdMS_TO_TICKS(MEASUREMENT_TIME_TYPICAL_RES_HIGH_MS);
+    static constexpr TickType_t MEASUREMENT_TIME_TYPICAL_TICKS_RES_LOW = pdMS_TO_TICKS(MEASUREMENT_TIME_TYPICAL_RES_LOW_MS);
 
-    static constexpr auto MEASUREMENT_TIME_DEFAULT = static_cast<float>(BH1750::MEASUREMENT_TIME_DEFAULT);
+    static constexpr auto MEASUREMENT_TIME_REFERENCE_DEFAULT_FLOAT = static_cast<float>(BH1750::MEASUREMENT_TIME_REFERENCE_DEFAULT_MS);
 
     TickType_t m_measurement_started_at_ticks = 0;
+    AmbientLightSensor::MeasurementResolution m_resolution = HIGH;
     float m_previous_measurement = static_cast<float>(BH1750::RESET_VALUE);
-    MeasurementResolution m_resolution = MeasurementResolution::HIGH;
 };
 
 void test_ALS();
