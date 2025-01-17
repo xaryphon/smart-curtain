@@ -10,19 +10,19 @@ BH1750::BH1750(PicoW_I2C* i2c, BH1750::I2CDevAddr i2c_dev_addr)
 {
 }
 
-void BH1750::SetMode(BH1750::Mode mode)
+bool BH1750::SetMode(BH1750::Mode mode)
 {
-    if (GetMode() == mode) {
-        CLIOUT("Warning: Already in mode %hhu\n", mode);
-        return;
+    if (m_mode == mode) {
+        return true;
     }
     m_write_buffer[0] = mode;
     if (m_i2c->Write(m_dev_addr, m_write_buffer.data(), I2C_INSTRUCTION_BUF_LEN) != I2C_INSTRUCTION_BUF_LEN) {
         CLIOUT("Warning: I2C mode write failed.\n");
-        return;
+        return false;
     }
     m_mode = mode;
-    vTaskDelay(I2C_GRACE_PERIOD_TICKS);
+    CLIOUT("[Mode->] %hhu\n", mode);
+    return true;
 }
 
 BH1750::Mode BH1750::GetMode() const
@@ -33,7 +33,7 @@ BH1750::Mode BH1750::GetMode() const
 bool BH1750::ReadMeasurementData(uint16_t *data)
 {
     if (m_i2c->Read(m_dev_addr, m_read_buffer.data(), I2C_MEASUREMENT_BUF_LEN) != I2C_MEASUREMENT_BUF_LEN) {
-        CLIOUT("Warning: I2C measurement read failed.\n");
+        CLIOUT("Warning: BH1750 measurement read failed.\n");
         return false;
     }
     *data = static_cast<uint16_t>((m_read_buffer[0]) << 8U) | m_read_buffer[1];
@@ -45,42 +45,46 @@ bool BH1750::ReadMeasurementData(uint16_t *data)
     return true;
 }
 
-void BH1750::Reset()
+bool BH1750::Reset()
 {
     const Mode mode = GetMode();
     if (mode == Mode::POWER_DOWN) {
-        SetMode(Mode::POWER_ON);
+        if (!SetMode(Mode::POWER_ON)) {
+            CLIOUT("Warning: BH1750 POWER_ON command failed.\n");
+            return false;
+        }
     }
     m_write_buffer[0] = Operation::RESET;
     if (m_i2c->Write(m_dev_addr, m_write_buffer.data(), I2C_INSTRUCTION_BUF_LEN) != I2C_INSTRUCTION_BUF_LEN) {
-        CLIOUT("Warning: I2C reset write failed.\n");
-        return;
+        CLIOUT("Warning: BH1750 RESET command failed.\n");
+        return false;
     }
-    vTaskDelay(I2C_GRACE_PERIOD_TICKS);
+    CLIOUT("[Reset]\n");
     if (mode == Mode::POWER_DOWN) {
-        SetMode(Mode::POWER_DOWN);
+        if (!SetMode(Mode::POWER_DOWN)) {
+            CLIOUT("Warning: BH1750 POWER_DOWN command failed.\n");
+            return false;
+        }
     }
+    return true;
 }
 
 bool BH1750::SetMeasurementTimeMS(uint8_t measurement_time_ms)
 {
-    if (measurement_time_ms <= MEASUREMENT_TIME_MIN || MEASUREMENT_TIME_MAX <= measurement_time_ms) {
-        CLIOUT("Error: Measurement time [%hhu] outside accepted range (%hhu - %hhu).\n",
-               measurement_time_ms, MEASUREMENT_TIME_MIN, MEASUREMENT_TIME_MAX);
-        return false;
+    if (measurement_time_ms == m_measurement_time_ms) {
+        return true;
     }
     m_write_buffer[0] = Operation::SET_MTREG_HIGH_BITS | static_cast<uint8_t>(measurement_time_ms & MEASUREMENT_TIME_HIGH_BITS);
     if (m_i2c->Write(m_dev_addr, m_write_buffer.data(), I2C_INSTRUCTION_BUF_LEN) != I2C_INSTRUCTION_BUF_LEN) {
-        CLIOUT("Warning: I2C MTReg-high-bits write failed.\n");
+        CLIOUT("Warning: BH1750 MTReg-high-bits write failed.\n");
         return false;
     }
-    vTaskDelay(I2C_GRACE_PERIOD_TICKS);
     m_write_buffer[0] = Operation::SET_MTREG_LOW_BITS | static_cast<uint8_t>(measurement_time_ms & MEASUREMENT_TIME_LOW_BITS);
     if (m_i2c->Write(m_dev_addr, m_write_buffer.data(), I2C_INSTRUCTION_BUF_LEN) != I2C_INSTRUCTION_BUF_LEN) {
-        CLIOUT("Warning: I2C MTReg-low-bits write failed.\n");
+        CLIOUT("Warning: BH1750 MTReg-low-bits write failed.\n");
         return false;
     }
-    vTaskDelay(I2C_GRACE_PERIOD_TICKS);
+    CLIOUT("[MeasurementTime->] %hhu ms\n", measurement_time_ms);
     m_measurement_time_ms = measurement_time_ms;
     return true;
 }

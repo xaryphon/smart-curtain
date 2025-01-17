@@ -39,16 +39,14 @@ protected:
     };
 
     explicit BH1750(PicoW_I2C* picoI2C, BH1750::I2CDevAddr i2c_dev_addr);
-    void SetMode(BH1750::Mode mode);
+    bool SetMode(BH1750::Mode mode);
     BH1750::Mode GetMode() const;
     bool ReadMeasurementData(uint16_t *data);
-    void Reset();
+    bool Reset();
     bool SetMeasurementTimeMS(uint8_t measurement_time_ms);
     uint8_t GetMeasurementTimeMs() const;
 
-    static constexpr uint8_t MEASUREMENT_TIME_MIN = 31;
     static constexpr uint8_t MEASUREMENT_TIME_DEFAULT = 69; // nice
-    static constexpr uint8_t MEASUREMENT_TIME_MAX = 254;
 
     static constexpr float MODE_FACTOR_HIGH = 1;
     static constexpr float MODE_FACTOR_HIGH_2 = 0.5;
@@ -58,7 +56,6 @@ protected:
 private:
     static constexpr size_t I2C_INSTRUCTION_BUF_LEN = sizeof(uint8_t);
     static constexpr size_t I2C_MEASUREMENT_BUF_LEN = sizeof(uint16_t);
-    static constexpr uint32_t I2C_GRACE_PERIOD_TICKS = pdMS_TO_TICKS(10);
     static constexpr uint8_t MEASUREMENT_TIME_HIGH_BITS = 0b11100000U;
     static constexpr uint8_t MEASUREMENT_TIME_LOW_BITS = 0b00011111U;
 
