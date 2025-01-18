@@ -7,24 +7,53 @@
 
 #include "config.h"
 
-SPI::SPI(RX0 pin_rx, TX0 pin_tx, SCK0 pin_sck, uint baud_rate)
-    : SPI(spi0, static_cast<uint>(pin_rx), static_cast<uint>(pin_tx), static_cast<uint>(pin_sck), static_cast<uint>(baud_rate))
+SPI* SPI::isr0 = nullptr;
+SPI* SPI::isr1 = nullptr;
+
+void SPI::ISR0()
 {
+    if (isr0 != nullptr) {
+        isr0->ISR();
+    } else {
+        irq_set_enabled(SPI0_IRQ, false);
+    }
+}
+
+void SPI::ISR1()
+{
+    if (isr1 != nullptr) {
+        isr1->ISR();
+    } else {
+        irq_set_enabled(SPI1_IRQ, false);
+    }
+}
+
+SPI::SPI(RX0 pin_rx, TX0 pin_tx, SCK0 pin_sck, uint baud_rate)
+    : SPI(spi0, static_cast<uint>(pin_rx), static_cast<uint>(pin_tx), static_cast<uint>(pin_sck), static_cast<uint>(baud_rate), SPI0_IRQ, ISR0)
+{
+    assert(isr0 == nullptr);
+    isr0 = this;
 }
 
 SPI::SPI(RX1 pin_rx, TX1 pin_tx, SCK1 pin_sck, uint baud_rate)
-    : SPI(spi1, static_cast<uint>(pin_rx), static_cast<uint>(pin_tx), static_cast<uint>(pin_sck), static_cast<uint>(baud_rate))
+    : SPI(spi1, static_cast<uint>(pin_rx), static_cast<uint>(pin_tx), static_cast<uint>(pin_sck), static_cast<uint>(baud_rate), SPI1_IRQ, ISR1)
 {
+    assert(isr1 == nullptr);
+    isr1 = this;
 }
 
-SPI::SPI(spi_inst_t* inst, uint pin_rx, uint pin_tx, uint pin_sck, uint baud_rate)
+SPI::SPI(spi_inst_t* inst, uint pin_rx, uint pin_tx, uint pin_sck, uint baud_rate, uint irqn, irq_handler_t irq_handler)
     : m_inst(inst)
     , m_baud_rate(spi_init(inst, baud_rate))
+    , m_irqn(irqn)
     , m_mutex(xSemaphoreCreateMutex())
+    , m_notify_semaphore(xSemaphoreCreateBinary())
 {
     gpio_set_function(pin_rx, GPIO_FUNC_SPI);
     gpio_set_function(pin_tx, GPIO_FUNC_SPI);
     gpio_set_function(pin_sck, GPIO_FUNC_SPI);
+    irq_set_enabled(m_irqn, false);
+    irq_set_exclusive_handler(m_irqn, irq_handler);
 }
 
 uint SPI::Transaction(CS pin_cs, TransmitBuffer* wbufs, size_t wbuf_count, ReceiveBuffer* rbufs, size_t rbuf_count)
@@ -46,7 +75,6 @@ uint SPI::Transaction(CS pin_cs, TransmitBuffer* wbufs, size_t wbuf_count, Recei
     assert(wlen == rlen);
 
     xSemaphoreTake(m_mutex, portMAX_DELAY);
-    gpio_put(static_cast<uint>(pin_cs), false);
 
     m_tx_buffers = wbufs + 1;
     m_tx_remaining_total = wlen;
@@ -56,22 +84,20 @@ uint SPI::Transaction(CS pin_cs, TransmitBuffer* wbufs, size_t wbuf_count, Recei
     m_rx_remaining_total = rlen;
     m_rx_current = rbufs[0];
 
-    // TODO: Switch to interrupts instead of blocking
-    while (m_rx_remaining_total > 0) {
-        FillTxBuffer();
-        FillRxBuffer();
-    }
+    spi_get_hw(m_inst)->imsc = SPI_SSPIMSC_TXIM_BITS | SPI_SSPIMSC_RXIM_BITS;
 
+    gpio_put(static_cast<uint>(pin_cs), false);
+    irq_set_enabled(m_irqn, true);
+
+    xSemaphoreTake(m_notify_semaphore, portMAX_DELAY);
+
+    irq_set_enabled(m_irqn, false);
     gpio_put(static_cast<uint>(pin_cs), true);
+
     xSemaphoreGive(m_mutex);
+
     return wlen;
 }
-
-#if 0
-#define SPI_LOG(...) printf(__VA_ARGS__)
-#else
-#define SPI_LOG(...)
-#endif
 
 void SPI::FillTxBuffer()
 {
@@ -80,7 +106,6 @@ void SPI::FillTxBuffer()
         if (m_tx_current.buffer != nullptr) {
             byte = *m_tx_current.buffer++;
         }
-        SPI_LOG("TX 0x%02x\n", byte);
         spi_get_hw(m_inst)->dr = byte;
         --m_tx_remaining_total;
         if (--m_tx_current.length == 0) {
@@ -94,7 +119,6 @@ void SPI::FillRxBuffer()
     while (spi_is_readable(m_inst)) {
         assert(m_rx_remaining_total > 0);
         uint8_t byte = spi_get_hw(m_inst)->dr;
-        SPI_LOG("RX 0x%02x -> %p\n", byte, m_rx_current.buffer);
         if (m_rx_current.buffer != nullptr) {
             *m_rx_current.buffer++ = byte;
         }
@@ -102,6 +126,18 @@ void SPI::FillRxBuffer()
         if (--m_rx_current.length == 0) {
             m_rx_current = *m_rx_buffers++;
         }
+    }
+}
+
+void SPI::ISR()
+{
+    FillRxBuffer();
+    FillTxBuffer();
+    if (m_tx_remaining_total == 0) {
+        spi_get_hw(m_inst)->imsc = SPI_SSPIMSC_RXIM_BITS;
+    }
+    if (m_rx_remaining_total == 0) {
+        xSemaphoreGiveFromISR(m_notify_semaphore, nullptr);
     }
 }
 

@@ -55,17 +55,25 @@ public:
     uint GetBaudRate() const { return m_baud_rate; }
 
 private:
-    explicit SPI(spi_inst_t* inst, uint pin_rx, uint pin_tx, uint pin_sck, uint baud_rate);
+    explicit SPI(spi_inst_t* inst, uint pin_rx, uint pin_tx, uint pin_sck, uint baud_rate, uint irqn, irq_handler_t irq_handler);
+
+    static SPI* isr0;
+    static SPI* isr1;
+    static void ISR0();
+    static void ISR1();
 
     void FillTxBuffer();
     void FillRxBuffer();
+    void ISR();
 
     static constexpr size_t FIFO_DEPTH = 8;
 
     spi_inst_t* m_inst;
     uint m_baud_rate;
+    uint m_irqn;
 
     SemaphoreHandle_t m_mutex;
+    SemaphoreHandle_t m_notify_semaphore;
 
     TransmitBuffer* m_tx_buffers = nullptr;
     size_t m_tx_remaining_total = 0;
