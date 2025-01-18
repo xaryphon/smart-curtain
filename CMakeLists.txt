@@ -34,6 +34,7 @@ target_link_libraries(${PROJECT_NAME}
     FreeRTOS-Kernel-Heap4
     hardware_i2c
     hardware_adc
+    hardware_spi
     pico_cyw43_arch_lwip_sys_freertos
     pico_lwip_mbedtls
     pico_mbedtls

@@ -7,4 +7,6 @@ target_sources(${PROJECT_NAME} PRIVATE
     main.cpp
     Motor.cpp
     PicoW_I2C.cpp
+    SPI.cpp
+    SPIDevice.cpp
 )
