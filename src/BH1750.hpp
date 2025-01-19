@@ -65,28 +65,25 @@ protected:
     static constexpr float MODE_FACTOR_LOW = 4;
     static constexpr float ACCURACY_FACTOR = 1.2;
 
-private:
-
-    std::map<BH1750::Mode, const char *> MODE_STR = {
-        {Mode::POWER_DOWN, "POWER_DOWN"},
-        {Mode::POWER_ON, "POWER_ON"},
-        {Mode::CONTINUOUS_HIGH, "CONTINUOUS_HIGH"},
-        {Mode::CONTINUOUS_MEDIUM, "CONTINUOUS_MEDIUM"},
-        {Mode::CONTINUOUS_LOW, "CONTINUOUS_LOW"},
-        {Mode::ONE_TIME_HIGH, "ONE_TIME_HIGH"},
-        {Mode::ONE_TIME_MEDIUM, "ONE_TIME_MEDIUM"},
-        {Mode::ONE_TIME_LOW, "ONE_TIME_LOW"},
+    std::map<BH1750::Mode, const char*> MODE_STR = {
+        { Mode::POWER_DOWN, "POWER_DOWN" },
+        { Mode::POWER_ON, "POWER_ON" },
+        { Mode::CONTINUOUS_HIGH, "CONTINUOUS_HIGH" },
+        { Mode::CONTINUOUS_MEDIUM, "CONTINUOUS_MEDIUM" },
+        { Mode::CONTINUOUS_LOW, "CONTINUOUS_LOW" },
+        { Mode::ONE_TIME_HIGH, "ONE_TIME_HIGH" },
+        { Mode::ONE_TIME_MEDIUM, "ONE_TIME_MEDIUM" },
+        { Mode::ONE_TIME_LOW, "ONE_TIME_LOW" },
     };
 
+private:
     static constexpr size_t I2C_INSTRUCTION_BUF_LEN = sizeof(uint8_t);
     static constexpr size_t I2C_MEASUREMENT_BUF_LEN = sizeof(uint16_t);
-    static constexpr uint8_t MEASUREMENT_TIME_HIGH_BITS = 0b11100000U;
-    static constexpr uint8_t MEASUREMENT_TIME_LOW_BITS = 0b00011111U;
 
     PicoW_I2C* m_i2c;
     BH1750::I2CDevAddr m_dev_addr;
     std::array<uint8_t, I2C_INSTRUCTION_BUF_LEN> m_write_buffer = {};
     std::array<uint8_t, I2C_MEASUREMENT_BUF_LEN> m_read_buffer = {};
     BH1750::Mode m_mode = POWER_DOWN;
-    uint8_t m_measurement_time_ms = MEASUREMENT_TIME_REFERENCE_DEFAULT_MS;
+    uint8_t m_measurement_time_reference_ms = MEASUREMENT_TIME_REFERENCE_DEFAULT_MS;
 };

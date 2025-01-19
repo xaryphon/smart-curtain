@@ -1,15 +1,36 @@
 #include "AmbientLightSensor.hpp"
 
-#include <cstdio>
+#include "Logger.hpp"
+#include "config.h"
 
-#include <FreeRTOS.h>
-#include <task.h>
-
-#define CLIOUT printf
-
-AmbientLightSensor::AmbientLightSensor(PicoW_I2C* i2c, BH1750::I2CDevAddr i2c_dev_addr)
+AmbientLightSensor::AmbientLightSensor(const char * task_name, uint32_t stack_depth, BaseType_t task_priority, PicoW_I2C* i2c, BH1750::I2CDevAddr i2c_dev_addr)
     : BH1750(i2c, i2c_dev_addr)
 {
+    // Issue: Delaying a task for less than 100 ms before the RP2040 has ran some small amount of time.
+    // Solution: Sleeping for 1 us before calling vTaskDelay resolves this issue.
+    // Theory: *Maybe* TaskDelay does some math internally that requires the hardware timer to be big enough to proceed
+    //         and simply returns without delaying if hardware timer < 0 us at the moment.
+    //         This is how it seems to behave.
+    sleep_us(1);
+    /// TODO: if this is the case, this should be done not just for ALS but for all tasks and thus by some dedicated operation.
+
+    if (xTaskCreate(TASK_KONDOM(AmbientLightSensor, Task),
+                task_name,
+                stack_depth,
+                static_cast<void *>(this),
+                tskIDLE_PRIORITY + task_priority,
+                &m_task_handle) == pdTRUE) {
+        Logger::Log("Created task [{}]", task_name);
+    } else {
+        Logger::Log("Error: Failed to create task [{}]", task_name);
+    }
+}
+
+void AmbientLightSensor::Initialize()
+{
+    BH1750::SetMeasurementTimeReference(BH1750::MEASUREMENT_TIME_REFERENCE_DEFAULT_MS);
+    BH1750::SetMode(BH1750::Mode::POWER_DOWN);
+    BH1750::Reset();
 }
 
 bool AmbientLightSensor::ReadLuxBlocking(float* lux)
@@ -31,7 +52,7 @@ bool AmbientLightSensor::ReadLuxBlocking(float* lux)
     WaitForMeasurement();
     uint16_t measurement_data = BH1750::RESET_VALUE;
     if (!BH1750::ReadMeasurementData(&measurement_data)) {
-        CLIOUT("Warning: Failed to read indoor/outdoor sensor.\n");
+        Logger::Log("Warning: Failed to read indoor/outdoor sensor.");
         return false;
     }
     *lux = Uint16ToLux(measurement_data);
@@ -93,12 +114,13 @@ void AmbientLightSensor::AdjustMeasurementSettings(AmbientLightSensor::Measureme
     case BH1750::Mode::ONE_TIME_LOW:
         break;
     default:
-        CLIOUT("Error: Mode command %hhu | %hhu unfit for measuring\n", measurement_type, m_resolution);
+        Logger::Log("Error: Mode command {} | {} unfit for measuring",
+            static_cast<uint8_t>(measurement_type), static_cast<uint8_t>(m_resolution));
         return;
     }
     const BH1750::Mode prev_mode = BH1750::GetMode();
     if (!BH1750::SetMode(new_mode)) {
-        CLIOUT("Warning: Failed to set ALS mode to %hhu\n", new_mode);
+        Logger::Log("Warning: Failed to set ALS mode to {}", BH1750::MODE_STR[new_mode]);
         return;
     }
     if (prev_mode == BH1750::Mode::POWER_DOWN || prev_mode == BH1750::Mode::POWER_ON) {
@@ -123,10 +145,9 @@ float AmbientLightSensor::Uint16ToLux(uint16_t u16) const
         lux *= measurement_time_factor;
     }
     float mode_factor = MODE_FACTOR_MEDIUM;
-    const Mode mode = BH1750::GetMode();
-    if (mode == BH1750::Mode::CONTINUOUS_HIGH || mode == BH1750::Mode::ONE_TIME_HIGH) {
+    if (m_resolution == MeasurementResolution::HIGH) {
         mode_factor = MODE_FACTOR_HIGH;
-    } else if (mode == BH1750::Mode::CONTINUOUS_LOW || mode == BH1750::Mode::ONE_TIME_LOW) {
+    } else if (m_resolution == MeasurementResolution::LOW) {
         mode_factor = MODE_FACTOR_LOW;
     }
     lux *= mode_factor;
@@ -149,16 +170,15 @@ void AmbientLightSensor::MediateMeasurementTime()
 
 TickType_t AmbientLightSensor::GetMeasurementTimeTicks() const
 {
-    const float measurement_time_factor = MEASUREMENT_TIME_REFERENCE_DEFAULT_FLOAT / static_cast<float>(BH1750::GetMeasurementTimeReferenceMs());
     switch (m_resolution) {
     case MEDIUM:
-        return static_cast<TickType_t>(MEASUREMENT_TIME_TYPICAL_TICKS_RES_MEDIUM * measurement_time_factor);
+        return static_cast<TickType_t>(MEASUREMENT_TIME_TYPICAL_TICKS_RES_MEDIUM * m_measurement_time_reference_factor);
     case HIGH:
-        return static_cast<TickType_t>(MEASUREMENT_TIME_TYPICAL_TICKS_RES_HIGH * measurement_time_factor);
+        return static_cast<TickType_t>(MEASUREMENT_TIME_TYPICAL_TICKS_RES_HIGH * m_measurement_time_reference_factor);
     case LOW:
-        return static_cast<TickType_t>(MEASUREMENT_TIME_TYPICAL_TICKS_RES_LOW * measurement_time_factor);
+        return static_cast<TickType_t>(MEASUREMENT_TIME_TYPICAL_TICKS_RES_LOW * m_measurement_time_reference_factor);
     default:
-        return static_cast<TickType_t>(MEASUREMENT_TIME_TYPICAL_TICKS_RES_MEDIUM * measurement_time_factor);
+        return static_cast<TickType_t>(MEASUREMENT_TIME_TYPICAL_TICKS_RES_MEDIUM * m_measurement_time_reference_factor);
     }
 }
 
@@ -170,68 +190,70 @@ void AmbientLightSensor::StartContinuousMeasurement()
 void AmbientLightSensor::StopContinuousMeasurement()
 {
     if (!BH1750::SetMode(BH1750::Mode::POWER_DOWN)) {
-        CLIOUT("Warning: Failed to stop continuous measurement mode\n");
+        Logger::Log("Warning: Failed to stop continuous measurement mode");
     }
 }
 
 void AmbientLightSensor::ResetMeasurement()
 {
     if (!BH1750::Reset()) {
-        CLIOUT("Warning: Failed to reset measurement\n");
+        Logger::Log("Warning: Failed to reset measurement");
     }
 }
 
-/// TODO: remove
-void test_task(void* params)
+void AmbientLightSensor::SetMeasurementTimeFactor(float factor)
 {
-    (void)params; // apparently one way to shut up lint
-    auto sda = PicoW_I2C::SDA1Pin::SDA1_26;
-    auto scl = PicoW_I2C::SCL1Pin::SCL1_27;
-    auto i2c_1 = std::make_unique<PicoW_I2C>(sda, scl, BH1750::BAUDRATE_MAX);
-    auto ALS = AmbientLightSensor(i2c_1.get(), BH1750::I2CDevAddr::ADDR_LOW);
+    if (factor == m_measurement_time_reference_factor) {
+        return;
+    }
+    if (factor < 0) {
+        Logger::Log("Error: Cannot set measurement time reference to negative; factor: {}", factor);
+        return;
+    }
+    const auto mt_ref_ms = static_cast<uint32_t>(MEASUREMENT_TIME_REFERENCE_DEFAULT_FLOAT * factor);
+    if (!BH1750::SetMeasurementTimeReference(mt_ref_ms)) {
+        return;
+    }
+    m_measurement_time_reference_factor = factor;
+    Logger::Log("Measurement Time multiplied to x{}", m_measurement_time_reference_factor);
+}
+
+void AmbientLightSensor::Task()
+{
+    Initialize();
+
     uint m_i = 0;
     float measurement = 0;
     const int cont_reads = 10;
+    float measurement_time_factor = 0.1;
+
     while (true) {
 
         uint64_t start = time_us_64();
-        ALS.ReadLuxBlocking(&measurement);
+        ReadLuxBlocking(&measurement);
         uint64_t stop = time_us_64();
-        CLIOUT("One time read #%u: %f in %llu us\n", ++m_i, measurement, stop - start);
+        Logger::Log("One time read #{}: {} in {} us", ++m_i, measurement, stop - start);
 
-        ALS.StartContinuousMeasurement();
+        StartContinuousMeasurement();
         start = time_us_64();
 
-        CLIOUT("%d continuous reads\n", cont_reads);
+        Logger::Log("{} continuous reads", cont_reads);
         for (int cont_read_i = 0; cont_read_i < cont_reads; ++cont_read_i) {
-            if (ALS.ReadLuxBlocking(&measurement)) {
+            if (ReadLuxBlocking(&measurement)) {
                 stop = time_us_64();
-                CLIOUT("Cont read #%u: %f in %llu us\n", ++m_i, measurement, stop - start);
+                Logger::Log("Cont read #{}: {} in {} us", ++m_i, measurement, stop - start);
                 start = stop;
             } else {
-                CLIOUT("Warning: Failed to receive lux measurement.\n");
+                Logger::Log("Warning: Failed to receive lux measurement");
             }
         }
-        ALS.StopContinuousMeasurement();
-        ALS.ResetMeasurement();
+        StopContinuousMeasurement();
+        ResetMeasurement();
+        SetMeasurementTimeFactor(measurement_time_factor);
+        measurement_time_factor += 0.1;
+        if (measurement_time_factor >= 4) {
+            measurement_time_factor = 0.1;
+        }
+
     }
-}
-
-/// TODO: remove
-void test_ALS()
-{
-    // Issue: Delaying a task for less than 100 ms before the RP2040 has ran some small amount of time.
-    // Solution: Sleeping for 1 us before calling vTaskDelay resolves this issue.
-    // Theory: *Maybe* TaskDelay does some math internally that requires the hardware timer to be big enough to proceed
-    //         and simply returns without delaying if hardware timer < 0 us at the moment.
-    //         This is how it seems to behave.
-    sleep_us(1);
-    /// TODO: if this is the case, this should be done not just for ALS but for all tasks and thus by some dedicated operation.
-
-    xTaskCreate(test_task,
-        "ALS",
-        DEFAULT_TASK_STACK_SIZE,
-        nullptr,
-        tskIDLE_PRIORITY + 3,
-        nullptr);
 }
