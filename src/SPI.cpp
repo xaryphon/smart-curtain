@@ -90,9 +90,15 @@ uint SPI::Transaction(CS pin_cs, TransmitBuffer* wbufs, size_t wbuf_count, Recei
     irq_set_enabled(m_irqn, true);
 
     xSemaphoreTake(m_notify_semaphore, portMAX_DELAY);
+    while (m_rx_remaining_total > 0) {
+        FillRxBuffer();
+    }
 
     irq_set_enabled(m_irqn, false);
     gpio_put(static_cast<uint>(pin_cs), true);
+
+    assert(m_tx_remaining_total == 0);
+    assert(m_rx_remaining_total == 0);
 
     xSemaphoreGive(m_mutex);
 
@@ -134,9 +140,8 @@ void SPI::ISR()
     FillRxBuffer();
     FillTxBuffer();
     if (m_tx_remaining_total == 0) {
-        spi_get_hw(m_inst)->imsc = SPI_SSPIMSC_RXIM_BITS;
-    }
-    if (m_rx_remaining_total == 0) {
+        spi_get_hw(m_inst)->imsc = 0;
+        irq_set_enabled(m_irqn, false);
         xSemaphoreGiveFromISR(m_notify_semaphore, nullptr);
     }
 }
