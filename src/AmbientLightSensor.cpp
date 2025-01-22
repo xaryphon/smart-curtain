@@ -6,7 +6,8 @@
 AmbientLightSensor::AmbientLightSensor(const char * task_name, uint32_t stack_depth, BaseType_t task_priority, PicoW_I2C* i2c, BH1750::I2CDevAddr i2c_dev_addr)
     : BH1750(i2c, i2c_dev_addr)
 {
-    // Issue: Delaying a task for less than 100 ms before the RP2040 has ran some small amount of time.
+    // Issue: Delaying a task for less than 100 ms before the RP2040 has ran some small amount of time
+    //        reduces the delay(s) unreliable.
     // Solution: Sleeping for 1 us before calling vTaskDelay resolves this issue.
     // Theory: *Maybe* TaskDelay does some math internally that requires the hardware timer to be big enough to proceed
     //         and simply returns without delaying if hardware timer < 0 us at the moment.
@@ -130,11 +131,8 @@ void AmbientLightSensor::AdjustMeasurementSettings(AmbientLightSensor::Measureme
 
 void AmbientLightSensor::WaitForMeasurement()
 {
-    const TickType_t now = xTaskGetTickCount();
-    if (m_measurement_started_at_ticks > now) {
-        vTaskDelay(m_measurement_started_at_ticks - xTaskGetTickCount());
-    }
-    xTaskDelayUntil(&m_measurement_started_at_ticks, GetMeasurementTimeTicks());
+    xTaskDelayUntil(&m_measurement_started_at_ticks, GetMeasurementTimeTicks() + m_measurement_time_mediation);
+    m_measurement_time_mediation = 0;
 }
 
 float AmbientLightSensor::Uint16ToLux(uint16_t u16) const
@@ -165,7 +163,8 @@ float AmbientLightSensor::Uint16ToLux(uint16_t u16) const
  */
 void AmbientLightSensor::MediateMeasurementTime()
 {
-    m_measurement_started_at_ticks = xTaskGetTickCount() + GetMeasurementTimeTicks() / 2;
+    m_measurement_started_at_ticks = xTaskGetTickCount();
+    m_measurement_time_mediation = GetMeasurementTimeTicks() / 2;
 }
 
 TickType_t AmbientLightSensor::GetMeasurementTimeTicks() const

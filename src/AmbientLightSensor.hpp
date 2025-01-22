@@ -54,6 +54,7 @@ private:
 
     TaskHandle_t m_task_handle = nullptr;
     TickType_t m_measurement_started_at_ticks = 0;
+    TickType_t m_measurement_time_mediation = 0;
     AmbientLightSensor::MeasurementResolution m_resolution = HIGH;
     float m_previous_measurement = static_cast<float>(BH1750::RESET_VALUE);
     float m_measurement_time_reference_factor = MEASUREMENT_TIME_REFERENCE_DEFAULT_FLOAT / MEASUREMENT_TIME_REFERENCE_DEFAULT_FLOAT;
