@@ -14,8 +14,9 @@ uint32_t Logger::m_lost_logs = 0;
 
 void Logger::Initialize()
 {
-    m_syslog_q = xQueueCreate(SYSLOG_QUEUE_LENGTH, sizeof(log_content*));
+    m_syslog_q = xQueueCreate(SYSLOG_QUEUE_LENGTH, sizeof(LogContent*));
     m_mutex = xSemaphoreCreateMutex();
+    write(1, "\n", 1);
 }
 
 Logger::Logger(const char* task_name, uint32_t stack_depth, UBaseType_t priority)
@@ -34,25 +35,44 @@ Logger::Logger(const char* task_name, uint32_t stack_depth, UBaseType_t priority
     }
 }
 
-void Logger::LogToQueue(std::string str)
+void Logger::LogMessage(std::string msg)
 {
-    xSemaphoreTake(m_mutex, portMAX_DELAY);
+    auto* log = new LogContent(std::move(msg));
+    if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
+        xSemaphoreTake(m_mutex, portMAX_DELAY);
+        LogToQueue(log);
+        xSemaphoreGive(m_mutex);
+    } else {
+        log->PrintAndDelete();
+    }
+}
 
-    auto* log = new Logger::log_content {
-        /// TODO: real time
-        .timestamp = time_us_64(),
-        .task_name = GetTaskName(),
-        .msg = std::move(str)
-    };
-
+void Logger::LogToQueue(Logger::LogContent* log)
+{
     if (xQueueSendToBack(m_syslog_q, &log, 0) != pdTRUE) {
         delete log;
         ++Logger::m_lost_logs;
     }
-    xSemaphoreGive(m_mutex);
 }
 
-const char* Logger::GetTaskName()
+Logger::LogContent::LogContent(std::string log_msg)
+    : timestamp(time_us_64())
+    , task_name(GetTaskName())
+    , msg(std::move(log_msg))
+{
+}
+
+void Logger::LogContent::PrintAndDelete()
+{
+    const std::string log = fmt::format("[{}] [{}] {}\n",
+        FormatTime(timestamp),
+        task_name,
+        msg);
+    write(1, log.c_str(), log.size());
+    delete this;
+}
+
+const char* Logger::LogContent::GetTaskName()
 {
     const char* taskName = "Unknown";
     if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
@@ -66,36 +86,8 @@ const char* Logger::GetTaskName()
     return taskName;
 }
 
-void Logger::Task()
-{
-    Logger::Log("Initiated");
-    write(1, "\n", 1);
-    while (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
-        while (xQueueReceive(
-                   m_syslog_q,
-                   static_cast<void*>(&m_log),
-                   m_lost_logs > 0 ? 0 : portMAX_DELAY)
-            == pdTRUE) {
-
-            const std::string log = fmt::format("[{}] [{}] {}\n",
-                FormatTime(m_log->timestamp),
-                m_log->task_name,
-                m_log->msg);
-            write(1, log.c_str(), log.size());
-
-            delete m_log;
-        }
-        if (m_lost_logs > 0) {
-            Logger::Log("Warning: lost {} logs.", m_lost_logs);
-            xSemaphoreTake(m_mutex, portMAX_DELAY);
-            Logger::m_lost_logs = 0;
-            xSemaphoreGive(m_mutex);
-        }
-    }
-}
-
 /// TODO: with real time, perhaps date or day of the weak
-std::string Logger::FormatTime(uint64_t time)
+std::string Logger::LogContent::FormatTime(uint64_t time)
 {
     enum : uint64_t {
         us_in_ms = 1000,
@@ -115,16 +107,31 @@ std::string Logger::FormatTime(uint64_t time)
         time % ms_in_s);
 }
 
-#include <pico/stdlib.h>
+void Logger::Task()
+{
+    Logger::Log("Initiated");
+    while (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
+        while (xQueueReceive(
+                   m_syslog_q,
+                   static_cast<void*>(&m_log),
+                   m_lost_logs > 0 ? 0 : portMAX_DELAY)
+            == pdTRUE) {
+            m_log->PrintAndDelete();
+        }
+        if (m_lost_logs > 0) {
+            xSemaphoreTake(m_mutex, portMAX_DELAY);
+            Logger::Log("Warning: lost {} logs.", m_lost_logs);
+            Logger::m_lost_logs = 0;
+            xSemaphoreGive(m_mutex);
+        }
+    }
+}
 
-#include "config.h"
-#include "example.h"
-
-// With current setup, pico tends to panic at around log number #8000 as it runs out of memory.
+// With current setup, pico tends to panic at around log number #8000 with one stresser as it runs out of memory.
 void StressTask(void* params)
 {
-    (void)params;
-    std::string msg = "a";
+    (void) params;
+    std::string msg {"a"};
     uint i = 1;
     while (true) {
         Logger::Log("#{}: {}", i++, msg);
@@ -133,7 +140,7 @@ void StressTask(void* params)
     }
 }
 
-void Logger_stress_tester()
+void Logger_stress_tester(const char* task_name)
 {
-    xTaskCreate(StressTask, "LoggerStresser", DEFAULT_TASK_STACK_SIZE, nullptr, 2, nullptr);
+    xTaskCreate(StressTask, task_name, DEFAULT_TASK_STACK_SIZE, nullptr, 2, nullptr);
 }
