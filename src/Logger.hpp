@@ -25,8 +25,8 @@ public:
     }
 
     struct log_content {
-        uint64_t timestamp { 0 };
-        const char* task_name { nullptr };
+        uint64_t timestamp = 0;
+        const char* task_name = nullptr;
         std::string msg;
     };
 
@@ -37,12 +37,11 @@ private:
     static std::string FormatTime(uint64_t time_us);
 
     static constexpr UBaseType_t SYSLOG_QUEUE_LENGTH = 10;
-    TaskHandle_t m_task_handle { nullptr };
+    TaskHandle_t m_task_handle = nullptr;
     static QueueHandle_t m_syslog_q;
     static SemaphoreHandle_t m_mutex;
-    static constexpr TickType_t LOG_BLOCK_TIME_TICKS = pdMS_TO_TICKS(100);
     static uint32_t m_lost_logs;
-    log_content* m_log {};
+    log_content* m_log = nullptr;
 };
 
-void test_Logger();
+void Logger_stress_tester();

@@ -2,6 +2,8 @@
 
 #include <utility>
 
+#include <sys/unistd.h>
+
 #include "config.h"
 
 /// TODO: classify queue
@@ -67,7 +69,7 @@ const char* Logger::GetTaskName()
 void Logger::Task()
 {
     Logger::Log("Initiated");
-    fmt::print("\n"); // jump over buffer garbage
+    write(1, "\n", 1);
     while (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
         while (xQueueReceive(
                    m_syslog_q,
@@ -75,10 +77,11 @@ void Logger::Task()
                    m_lost_logs > 0 ? 0 : portMAX_DELAY)
             == pdTRUE) {
 
-            fmt::print("[{}] [{}] {}\n",
+            const std::string log = fmt::format("[{}] [{}] {}\n",
                 FormatTime(m_log->timestamp),
                 m_log->task_name,
                 m_log->msg);
+            write(1, log.c_str(), log.size());
 
             delete m_log;
         }
@@ -117,22 +120,20 @@ std::string Logger::FormatTime(uint64_t time)
 #include "config.h"
 #include "example.h"
 
-void test_Logger()
+// With current setup, pico tends to panic at around log number #8000 as it runs out of memory.
+void StressTask(void* params)
 {
-    // Give time to open USB serial port // for testing.
-    sleep_ms(5000);
-    Logger::Log("Boot");
-
-    // Stack size could be investigated further.
-    // Even with plain C const char * 's, non-variadic arguments and no explicit memory allocation
-    // it's still practically the same.
-    new Logger("Logger", DEFAULT_TASK_STACK_SIZE * 3, 1);
-
-    const char* desc = "extra log #";
-
-    for (uint8_t i = 0; i < 10; ++i) {
-        Logger::Log("{}{}", desc, i);
+    (void)params;
+    std::string msg = "a";
+    uint i = 1;
+    while (true) {
+        Logger::Log("#{}: {}", i++, msg);
+        msg += "a";
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
+}
 
-    Logger::Log("Initializing Scheduler...");
+void Logger_stress_tester()
+{
+    xTaskCreate(StressTask, "LoggerStresser", DEFAULT_TASK_STACK_SIZE, nullptr, 2, nullptr);
 }
