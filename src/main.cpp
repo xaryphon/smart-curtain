@@ -3,9 +3,8 @@
 #include <pico/stdlib.h>
 #include <task.h>
 
-#include "example.h"
 #include "Logger.hpp"
-
+#include "example.h"
 
 extern "C" {
 uint32_t read_runtime_ctr(void)
@@ -16,7 +15,8 @@ uint32_t read_runtime_ctr(void)
 
 int main()
 {
-    assert(stdio_init_all());
+    const bool stdio_initialized = stdio_init_all();
+    assert(stdio_initialized);
     Logger::Initialize();
     Logger::Log("Boot");
 
