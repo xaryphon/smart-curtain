@@ -8,7 +8,7 @@
 static SemaphoreHandle_t g_W5500_Semaphore;
 static uint g_W5500_interrupt_pin;
 
-// TODO: Maybe create a interrupt handler class
+// TODO: Maybe create an interrupt handler class
 static void W5500_InterruptHandler(uint pin, uint32_t event_mask)
 {
     assert(pin == g_W5500_interrupt_pin);
