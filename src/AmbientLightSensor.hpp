@@ -10,7 +10,7 @@
 
 class AmbientLightSensor : private BH1750 {
 public:
-    explicit AmbientLightSensor(const char * name, uint32_t stack_depth, BaseType_t task_priority, PicoW_I2C* i2c, BH1750::I2CDevAddr i2c_dev_addr);
+    explicit AmbientLightSensor(const char* name, uint32_t stack_depth, BaseType_t task_priority, PicoW_I2C* i2c, BH1750::I2CDevAddr i2c_dev_addr);
 
 private:
     enum MeasurementType : uint8_t {
@@ -35,7 +35,7 @@ private:
 
     void Initialize();
     bool ReadLuxBlocking(float* lux);
-    void AdjustMeasurementSettings(AmbientLightSensor::MeasurementType measurement_type);
+    void AdjustMeasurementResolution(AmbientLightSensor::MeasurementType measurement_type);
     void WaitForMeasurement();
     float Uint16ToLux(uint16_t u16) const;
     void MediateMeasurementTime();

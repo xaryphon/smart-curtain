@@ -42,12 +42,12 @@ bool AmbientLightSensor::ReadLuxBlocking(float* lux)
     case ONE_TIME_MEDIUM:
     case ONE_TIME_HIGH:
     case ONE_TIME_LOW:
-        AdjustMeasurementSettings(MeasurementType::ONE_TIME);
+        AdjustMeasurementResolution(MeasurementType::ONE_TIME);
         break;
     case CONTINUOUS_MEDIUM:
     case CONTINUOUS_HIGH:
     case CONTINUOUS_LOW:
-        AdjustMeasurementSettings(MeasurementType::CONTINUOUS);
+        AdjustMeasurementResolution(MeasurementType::CONTINUOUS);
         break;
     }
     WaitForMeasurement();
@@ -89,7 +89,7 @@ bool AmbientLightSensor::ReadLuxBlocking(float* lux)
  * (medium) HIGH: ~4340 < prev_measurement < ~8680
  * (bright) LOW:  ~8680 < prev_measurement
  */
-void AmbientLightSensor::AdjustMeasurementSettings(AmbientLightSensor::MeasurementType measurement_type)
+void AmbientLightSensor::AdjustMeasurementResolution(AmbientLightSensor::MeasurementType measurement_type)
 {
     static const uint16_t EXPECTED_MAX_RAW_READ = 0b0101000101100001;
     static const auto ACCURACY_FACTOR = static_cast<float>(BH1750::ACCURACY_FACTOR);
@@ -121,7 +121,7 @@ void AmbientLightSensor::AdjustMeasurementSettings(AmbientLightSensor::Measureme
     }
     const BH1750::Mode prev_mode = BH1750::GetMode();
     if (!BH1750::SetMode(new_mode)) {
-        Logger::Log("Warning: Failed to set ALS mode to {}", BH1750::MODE_STR[new_mode]);
+        Logger::Log("Warning: Failed to set ALS mode to {}", ModeString(new_mode));
         return;
     }
     if (prev_mode == BH1750::Mode::POWER_DOWN || prev_mode == BH1750::Mode::POWER_ON) {
@@ -183,7 +183,7 @@ TickType_t AmbientLightSensor::GetMeasurementTimeTicks() const
 
 void AmbientLightSensor::StartContinuousMeasurement()
 {
-    AdjustMeasurementSettings(AmbientLightSensor::CONTINUOUS);
+    AdjustMeasurementResolution(AmbientLightSensor::CONTINUOUS);
 }
 
 void AmbientLightSensor::StopContinuousMeasurement()

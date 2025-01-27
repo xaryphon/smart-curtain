@@ -51,6 +51,7 @@ protected:
     bool Reset();
     bool SetMeasurementTimeReference(uint8_t measurement_time_reference_ms);
     uint8_t GetMeasurementTimeReferenceMs() const;
+    static const char * ModeString(BH1750::Mode mode);
 
     static constexpr uint8_t MEASUREMENT_TIME_REFERENCE_MIN_MS = 31;
     static constexpr uint8_t MEASUREMENT_TIME_REFERENCE_DEFAULT_MS = 69; // nice
@@ -64,17 +65,6 @@ protected:
     static constexpr float MODE_FACTOR_HIGH = 0.5;
     static constexpr float MODE_FACTOR_LOW = 4;
     static constexpr float ACCURACY_FACTOR = 1.2;
-
-    std::map<BH1750::Mode, const char*> MODE_STR = {
-        { Mode::POWER_DOWN, "POWER_DOWN" },
-        { Mode::POWER_ON, "POWER_ON" },
-        { Mode::CONTINUOUS_HIGH, "CONTINUOUS_HIGH" },
-        { Mode::CONTINUOUS_MEDIUM, "CONTINUOUS_MEDIUM" },
-        { Mode::CONTINUOUS_LOW, "CONTINUOUS_LOW" },
-        { Mode::ONE_TIME_HIGH, "ONE_TIME_HIGH" },
-        { Mode::ONE_TIME_MEDIUM, "ONE_TIME_MEDIUM" },
-        { Mode::ONE_TIME_LOW, "ONE_TIME_LOW" },
-    };
 
 private:
     static constexpr size_t I2C_INSTRUCTION_BUF_LEN = sizeof(uint8_t);

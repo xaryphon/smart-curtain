@@ -19,7 +19,7 @@ bool BH1750::SetMode(BH1750::Mode mode)
         return false;
     }
     m_mode = mode;
-    Logger::Log("[Mode] {}", MODE_STR[mode]);
+    Logger::Log("[Mode] {}", ModeString(m_mode));
     return true;
 }
 
@@ -46,7 +46,7 @@ bool BH1750::Reset()
     const Mode mode = GetMode();
     if (mode == Mode::POWER_DOWN) {
         if (!SetMode(Mode::POWER_ON)) {
-            Logger::Log("Warning: BH1750 command {} failed", MODE_STR[POWER_DOWN]);
+            Logger::Log("Warning: BH1750 command {} failed", ModeString(Mode::POWER_ON));
             return false;
         }
     }
@@ -58,7 +58,7 @@ bool BH1750::Reset()
     Logger::Log("Measurement Reset");
     if (mode == Mode::POWER_DOWN) {
         if (!SetMode(Mode::POWER_DOWN)) {
-            Logger::Log("Warning: BH1750 command {} failed", MODE_STR[POWER_DOWN]);
+            Logger::Log("Warning: BH1750 command {} failed", ModeString(Mode::POWER_DOWN));
             return false;
         }
     }
@@ -94,4 +94,28 @@ bool BH1750::SetMeasurementTimeReference(uint8_t measurement_time_reference_ms)
 uint8_t BH1750::GetMeasurementTimeReferenceMs() const
 {
     return m_measurement_time_reference_ms;
+}
+
+const char* BH1750::ModeString(BH1750::Mode mode)
+{
+    switch (mode) {
+    case Mode::POWER_DOWN:
+        return "POWER_DOWN";
+    case Mode::POWER_ON:
+        return "POWER_ON";
+    case Mode::CONTINUOUS_MEDIUM:
+        return "CONTINUOUS_MEDIUM";
+    case Mode::CONTINUOUS_HIGH:
+        return "CONTINUOUS_HIGH";
+    case Mode::CONTINUOUS_LOW:
+        return "CONTINUOUS_LOW";
+    case Mode::ONE_TIME_MEDIUM:
+        return "ONE_TIME_MEDIUM";
+    case Mode::ONE_TIME_HIGH:
+        return "ONE_TIME_HIGH";
+    case Mode::ONE_TIME_LOW:
+        return "ONE_TIME_LOW";
+    default:
+        return "UNKNOWN";
+    }
 }
