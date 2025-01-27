@@ -2,7 +2,7 @@
 
 #include <lwip/netif.h>
 
-#include "SPIDevice.h"
+#include "SPIDevice.hpp"
 
 class W5500 {
 public:

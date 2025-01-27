@@ -1,4 +1,4 @@
-#include "SPI.h"
+#include "SPI.hpp"
 
 #include <cstdio>
 
@@ -147,7 +147,7 @@ void SPI::ISR()
 }
 
 // TODO: remove
-#include "SPIDevice.h"
+#include "SPIDevice.hpp"
 
 void spi_test_print_version(SPIDevice& dev)
 {

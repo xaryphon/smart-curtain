@@ -2,7 +2,7 @@
 
 #include <lwip/netif.h>
 
-#include "W5500.h"
+#include "W5500.hpp"
 
 class W5500LWIP : private W5500 {
 public:

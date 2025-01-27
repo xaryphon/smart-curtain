@@ -1,4 +1,4 @@
-#include "SPIDevice.h"
+#include "SPIDevice.hpp"
 
 SPIDevice::SPIDevice(SPI* spi, SPI::CS pin_cs)
     : m_spi(spi)

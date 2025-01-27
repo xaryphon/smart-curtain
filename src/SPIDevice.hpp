@@ -1,6 +1,6 @@
 #pragma once
 
-#include "SPI.h"
+#include "SPI.hpp"
 
 class SPIDevice {
 public:
