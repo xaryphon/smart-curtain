@@ -21,28 +21,34 @@ public:
     template <typename... T>
     static void Log(fmt::format_string<T...> fmt, T&&... args)
     {
-        LogToQueue(fmt::vformat(fmt, fmt::make_format_args(args...)));
+        LogMessage(fmt::vformat(fmt, fmt::make_format_args(args...)));
     }
 
-    struct log_content {
-        uint64_t timestamp { 0 };
-        const char* task_name { nullptr };
+private:
+    struct LogContent {
+    public:
+        explicit LogContent(std::string log_msg);
+        void PrintAndDelete();
+
+    private:
+        static const char* GetTaskName();
+        static std::string FormatTime(uint64_t time_us);
+
+        uint64_t timestamp;
+        const char* task_name;
         std::string msg;
     };
 
-private:
-    static void LogToQueue(std::string str);
-    static const char* GetTaskName();
+    static void LogMessage(std::string msg);
+    static void LogToQueue(LogContent* log);
     void Task();
-    static std::string FormatTime(uint64_t time_us);
 
     static constexpr UBaseType_t SYSLOG_QUEUE_LENGTH = 10;
-    TaskHandle_t m_task_handle { nullptr };
+    TaskHandle_t m_task_handle = nullptr;
     static QueueHandle_t m_syslog_q;
     static SemaphoreHandle_t m_mutex;
-    static constexpr TickType_t LOG_BLOCK_TIME_TICKS = pdMS_TO_TICKS(100);
     static uint32_t m_lost_logs;
-    log_content* m_log {};
+    LogContent* m_log = nullptr;
 };
 
-void test_Logger();
+void Logger_stress_tester(const char* task_name);
