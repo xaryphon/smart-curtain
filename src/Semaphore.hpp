@@ -59,13 +59,6 @@ public:
     {
     }
 
-    ~Counter() = default;
-    Counter(Counter&& counter) noexcept = default;
-
-    Counter(const Counter& counter) = delete;
-    Counter& operator=(const Counter& counter) = delete;
-    Counter& operator=(Counter&& counter) = delete;
-
     [[nodiscard]] UBaseType_t MaxCount() const { return m_max_count; }
 
 private:
@@ -93,13 +86,6 @@ public:
         : SemaphoreHandler(xSemaphoreCreateRecursiveMutex(), name)
     {
     }
-
-    ~RecursiveMutex() = default;
-    RecursiveMutex(RecursiveMutex&& recursive_mutex) noexcept = default;
-
-    RecursiveMutex(const RecursiveMutex& recursive_mutex) = delete;
-    RecursiveMutex& operator=(const RecursiveMutex& recursive_mutex) = delete;
-    RecursiveMutex& operator=(RecursiveMutex&& recursive_mutex) = delete;
 
     void Give() { xSemaphoreGiveRecursive(Handle()); }
     bool Take(TickType_t wait_time_ticks) { return xSemaphoreTakeRecursive(Handle(), wait_time_ticks) == pdFALSE; }
