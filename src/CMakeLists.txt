@@ -6,6 +6,8 @@ target_sources(${PROJECT_NAME} PRIVATE
     Logger.cpp
     main.cpp
     Motor.cpp
+    Primitive.cpp
+    Semaphore.cpp
     PicoW_I2C.cpp
     SPI.cpp
     SPIDevice.cpp
