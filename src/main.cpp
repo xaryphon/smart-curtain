@@ -31,7 +31,7 @@ int main()
         Logger::Log("Error: Failed to create [Example] task");
     }
     new Logger("Logger", DEFAULT_TASK_STACK_SIZE * 3, 1);
-    new AmbientLightSensor("ALS-Indoor", DEFAULT_TASK_STACK_SIZE, 3, i2c_1.get(), BH1750::I2CDevAddr::ADDR_LOW);
+    new AmbientLightSensor("ALS-Indoor", DEFAULT_TASK_STACK_SIZE * 2, 3, i2c_1.get(), BH1750::I2CDevAddr::ADDR_LOW);
 
     Logger::Log("Initializing Scheduler...");
     vTaskStartScheduler();
