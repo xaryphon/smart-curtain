@@ -35,7 +35,7 @@ SemaphoreHandler::SemaphoreHandler(SemaphoreHandle_t handle, const char* type, c
 bool RTOS::Semaphore::Give()
 {
     if (xSemaphoreGive(Handle()) == pdFALSE) {
-        Logger::Log("[{}] Error: {}.Give failed", TYPE, Name());
+        Logger::Log("Error: {}.Give failed",Name());
         return false;
     }
     return true;
@@ -44,7 +44,7 @@ bool RTOS::Semaphore::Give()
 bool RTOS::RecursiveMutex::Give()
 {
     if (xSemaphoreGiveRecursive(Handle()) != pdTRUE) {
-        Logger::Log("[{}] Error: {}.Give failed", TYPE, Name());
+        Logger::Log("Error: {}.Give failed",Name());
         return false;
     }
     return true;
