@@ -9,7 +9,6 @@ namespace RTOS::Implementation {
 SemaphoreHandler::~SemaphoreHandler()
 {
     if (m_handle != nullptr) {
-        vQueueUnregisterQueue(m_handle);
         vSemaphoreDelete(m_handle);
         Primitive::DecrementSemaphoreCount();
     }
@@ -18,17 +17,18 @@ SemaphoreHandler::~SemaphoreHandler()
 // Move Constructor
 SemaphoreHandler::SemaphoreHandler(SemaphoreHandler&& semaphore_handler) noexcept
     : m_handle(std::exchange(semaphore_handler.m_handle, nullptr))
+    , m_name(semaphore_handler.m_name)
 {
 }
 
 // Explicit Derivation Constructor
 SemaphoreHandler::SemaphoreHandler(SemaphoreHandle_t handle, const char* type, const char* name)
     : m_handle(handle)
+    , m_name(name)
 {
     assert(m_handle);
     Primitive::IncrementSemaphoreCount();
-    vQueueAddToRegistry(m_handle, name);
-    Logger::Log("[{}] '{}' created", type, Name());
+    Logger::Log("[{}] '{}' created", type, m_name);
 }
 } // namespace RTOS::Implementation
 

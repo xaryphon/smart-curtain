@@ -9,7 +9,6 @@ uint Primitive::s_queue_count = 0;
 void Primitive::IncrementSemaphoreCount()
 {
     ++s_semaphore_count;
-    assert(s_semaphore_count + s_queue_count <= configQUEUE_REGISTRY_SIZE);
 }
 
 void Primitive::DecrementSemaphoreCount()

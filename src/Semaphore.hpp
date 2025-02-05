@@ -15,7 +15,7 @@ namespace Implementation {
         SemaphoreHandler& operator=(const SemaphoreHandler& semaphore_handler) = delete;
         SemaphoreHandler& operator=(SemaphoreHandler&& /*unused*/) = delete;
 
-        [[nodiscard]] const char* Name() const { return pcQueueGetName(m_handle); }
+        [[nodiscard]] const char* Name() const { return m_name; }
 
     protected:
         explicit SemaphoreHandler(SemaphoreHandle_t handle, const char* type, const char* name);
@@ -23,6 +23,7 @@ namespace Implementation {
 
     private:
         SemaphoreHandle_t m_handle;
+        const char* m_name;
     };
 } // namespace Implementation
 
