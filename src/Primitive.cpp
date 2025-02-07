@@ -16,4 +16,15 @@ void Primitive::DecrementSemaphoreCount()
     assert(s_semaphore_count > 0);
     --s_semaphore_count;
 }
+
+void Primitive::IncrementQueueCount()
+{
+    ++s_queue_count;
+}
+
+void Primitive::DecrementQueueCount()
+{
+    assert(s_queue_count > 0);
+    --s_queue_count;
+}
 } // namespace RTOS::Implementation
