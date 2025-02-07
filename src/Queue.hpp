@@ -6,7 +6,6 @@
 #include "Primitive.hpp"
 
 namespace RTOS {
-
 template <typename ItemType>
 class Queue : private Implementation::Primitive {
 public:
@@ -15,6 +14,7 @@ public:
         , m_name(name)
         , m_queue_length(length)
     {
+        assert(length > 1);
         Logger::Log("[{}] '{}' created", TYPE, Name());
         Implementation::Primitive::IncrementQueueCount();
     }
