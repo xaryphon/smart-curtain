@@ -119,8 +119,8 @@ void Logger::Task()
             m_log->PrintAndDelete();
         }
         if (m_lost_logs > 0) {
-            xSemaphoreTake(m_mutex, portMAX_DELAY);
             Logger::Log("Warning: lost {} logs.", m_lost_logs);
+            xSemaphoreTake(m_mutex, portMAX_DELAY);
             Logger::m_lost_logs = 0;
             xSemaphoreGive(m_mutex);
         }
@@ -130,8 +130,8 @@ void Logger::Task()
 // With current setup, pico tends to panic at around log number #8000 with one stresser as it runs out of memory.
 void StressTask(void* params)
 {
-    (void) params;
-    std::string msg {"a"};
+    (void)params;
+    std::string msg { "a" };
     uint i = 1;
     while (true) {
         Logger::Log("#{}: {}", i++, msg);
