@@ -39,12 +39,12 @@ public:
     Queue& operator=(const Queue& queue) = delete;
     Queue& operator=(Queue&& /*unused*/) = delete;
 
-    bool Append(ItemType item, TickType_t wait_time_ticks) { return xQueueSendToBack(m_handle, &item, wait_time_ticks) == pdTRUE; }
-    bool AppendFromISR(ItemType item, BaseType_t* higher_priority_task_woken) { return xQueueSendToBackFromISR(m_handle, &item, higher_priority_task_woken) == pdTRUE; }
+    bool Append(const ItemType& item, TickType_t wait_time_ticks) { return xQueueSendToBack(m_handle, &item, wait_time_ticks) == pdTRUE; }
+    bool AppendFromISR(const ItemType& item, BaseType_t* higher_priority_task_woken) { return xQueueSendToBackFromISR(m_handle, &item, higher_priority_task_woken) == pdTRUE; }
     bool Peek(ItemType* item, TickType_t wait_time_ticks) { return xQueuePeek(m_handle, item, wait_time_ticks) == pdTRUE; }
     bool PeekFromISR(ItemType* item, BaseType_t* higher_priority_task_woken) { return xQueuePeekFromISR(m_handle, item, higher_priority_task_woken); }
-    bool Prepend(ItemType item, TickType_t wait_time_ticks) { return xQueueSendToFront(m_handle, &item, wait_time_ticks); }
-    bool PrependFromISR(ItemType item, BaseType_t* higher_priority_task_woken) { return xQueueSendToFrontFromISR(m_handle, &item, higher_priority_task_woken) == pdTRUE; }
+    bool Prepend(const ItemType& item, TickType_t wait_time_ticks) { return xQueueSendToFront(m_handle, &item, wait_time_ticks); }
+    bool PrependFromISR(const ItemType& item, BaseType_t* higher_priority_task_woken) { return xQueueSendToFrontFromISR(m_handle, &item, higher_priority_task_woken) == pdTRUE; }
     bool Receive(ItemType* item, TickType_t wait_time_ticks) { return xQueueReceive(m_handle, item, wait_time_ticks) == pdTRUE; }
     bool ReceiveFromISR(ItemType* item, BaseType_t* higher_priority_task_woken) { return xQueueReceiveFromISR(m_handle, item, higher_priority_task_woken); }
 
