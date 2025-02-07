@@ -87,7 +87,7 @@ err_t W5500LWIP::NetInit()
     m_netif.linkoutput = linkoutput;
     m_netif.mtu = 1500;
     m_netif.flags |= NETIF_FLAG_ETHARP | NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHERNET;
-    xTaskCreate([](void* param) { static_cast<decltype(this)>(param)->TaskEntry(); }, "W5500", 256, this, configMAX_PRIORITIES - 1, nullptr);
+    xTaskCreate([](void* param) { static_cast<decltype(this)>(param)->TaskEntry(); }, "W5500", 512, this, configMAX_PRIORITIES - 1, nullptr);
 
     return ERR_OK;
 }

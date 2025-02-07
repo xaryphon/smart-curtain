@@ -20,3 +20,13 @@ CPMAddPackage(
     "FMT_DOC OFF"
     "FMT_TEST OFF"
 )
+
+
+CPMAddPackage(
+    NAME picohttpparser
+    GIT_REPOSITORY https://github.com/h2o/picohttpparser.git
+    GIT_TAG f8d0513f1a7a111f2597d643b073935a8afaf9e5 # master 2025-01-30T08:30:00Z
+    DOWNLOAD_ONLY YES
+)
+add_library(picohttpparser STATIC ${picohttpparser_SOURCE_DIR}/picohttpparser.c)
+target_include_directories(picohttpparser PUBLIC ${picohttpparser_SOURCE_DIR})
