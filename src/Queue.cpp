@@ -4,12 +4,7 @@
 #include <FreeRTOS.h>
 #include <task.h>
 struct TestItem {
-    TestItem() = default;
-    explicit TestItem(int asdf)
-        : asd(asdf)
-    {
-    }
-    uint asd = 0;
+    uint asd;
 };
 
 struct TestParams {

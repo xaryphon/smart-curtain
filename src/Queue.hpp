@@ -8,6 +8,8 @@
 namespace RTOS {
 template <typename ItemType>
 class Queue : private Implementation::Primitive {
+    static_assert(std::is_pod_v<ItemType>);
+
 public:
     explicit Queue(UBaseType_t length, const char* name)
         : m_handle(xQueueCreate(length, sizeof(ItemType)))
