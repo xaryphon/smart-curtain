@@ -46,12 +46,12 @@ protected:
 
     explicit BH1750(PicoW_I2C* picoI2C, BH1750::I2CDevAddr i2c_dev_addr);
     bool SetMode(BH1750::Mode mode);
-    BH1750::Mode GetMode() const;
+    [[nodiscard]] BH1750::Mode GetMode() const { return m_mode; };
     bool ReadMeasurementData(uint16_t* data);
     bool Reset();
     bool SetMeasurementTimeReference(uint8_t measurement_time_reference_ms);
-    uint8_t GetMeasurementTimeReferenceMs() const;
-    static const char * ModeString(BH1750::Mode mode);
+    uint8_t GetMeasurementTimeReferenceMs() const { return m_measurement_time_reference_ms; };
+    static const char* ModeString(BH1750::Mode mode);
 
     static constexpr uint8_t MEASUREMENT_TIME_REFERENCE_MIN_MS = 31;
     static constexpr uint8_t MEASUREMENT_TIME_REFERENCE_DEFAULT_MS = 69; // nice

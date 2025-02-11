@@ -19,13 +19,8 @@ bool BH1750::SetMode(BH1750::Mode mode)
         return false;
     }
     m_mode = mode;
-    Logger::Log("[Mode] {}", ModeString(m_mode));
+    // Logger::Log("[Mode] {}", ModeString(m_mode));
     return true;
-}
-
-BH1750::Mode BH1750::GetMode() const
-{
-    return m_mode;
 }
 
 bool BH1750::ReadMeasurementData(uint16_t* data)
@@ -55,7 +50,7 @@ bool BH1750::Reset()
         Logger::Log("Warning: BH1750 command RESET failed");
         return false;
     }
-    Logger::Log("Measurement Reset");
+    // Logger::Log("Measurement Reset");
     if (mode == Mode::POWER_DOWN) {
         if (!SetMode(Mode::POWER_DOWN)) {
             Logger::Log("Warning: BH1750 command {} failed", ModeString(Mode::POWER_DOWN));
@@ -86,14 +81,9 @@ bool BH1750::SetMeasurementTimeReference(uint8_t measurement_time_reference_ms)
         Logger::Log("Warning: BH1750 MTReg-low-bits write failed");
         return false;
     }
-    Logger::Log("Measurement Time Reference set to {} ms", measurement_time_reference_ms);
+    // Logger::Log("Measurement Time Reference set to {} ms", measurement_time_reference_ms);
     m_measurement_time_reference_ms = measurement_time_reference_ms;
     return true;
-}
-
-uint8_t BH1750::GetMeasurementTimeReferenceMs() const
-{
-    return m_measurement_time_reference_ms;
 }
 
 const char* BH1750::ModeString(BH1750::Mode mode)

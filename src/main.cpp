@@ -31,8 +31,19 @@ int main()
         // handle error
         Logger::Log("Error: Failed to create [Example] task");
     }
+
+    auto* als_1_measure_now = new RTOS::Semaphore { "ALS-1-MeasureNow" };
+    auto* als_1_measure_continuously = new RTOS::Semaphore { "ALS-1-MeasureContinuously" };
+    auto* als_1_latest_lux = new RTOS::Variable<float> { "ALS-1-LatestLux" };
+
+    const AmbientLightSensor::Infrastructure als_1_infra {
+        .measure_now = als_1_measure_now,
+        .measure_continuously = als_1_measure_continuously,
+        .latest_lux = als_1_latest_lux,
+    };
+
     new Logger("Logger", DEFAULT_TASK_STACK_SIZE * 3, 1);
-    new AmbientLightSensor("ALS-Indoor", DEFAULT_TASK_STACK_SIZE * 2, 3, i2c_1.get(), BH1750::I2CDevAddr::ADDR_LOW);
+    new AmbientLightSensor("ALS-1", DEFAULT_TASK_STACK_SIZE * 2, 3, i2c_1.get(), BH1750::I2CDevAddr::ADDR_LOW, als_1_infra);
 
     Logger::Log("Semaphores: {}", RTOS::Implementation::Primitive::GetSemaphoreCount());
     Logger::Log("Queues: {}", RTOS::Implementation::Primitive::GetQueueCount());

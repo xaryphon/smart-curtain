@@ -3,8 +3,17 @@
 #include "Logger.hpp"
 #include "config.h"
 
-AmbientLightSensor::AmbientLightSensor(const char * task_name, uint32_t stack_depth, BaseType_t task_priority, PicoW_I2C* i2c, BH1750::I2CDevAddr i2c_dev_addr)
+AmbientLightSensor::AmbientLightSensor(
+    const char* task_name,
+    uint32_t stack_depth,
+    BaseType_t task_priority,
+    PicoW_I2C* i2c,
+    BH1750::I2CDevAddr i2c_dev_addr,
+    const Infrastructure& infra)
     : BH1750(i2c, i2c_dev_addr)
+    , m_measure_now(infra.measure_now)
+    , m_measure_continuously(infra.measure_continuously)
+    , m_latest_lux(infra.latest_lux)
 {
     // Issue: Delaying a task for less than 100 ms before the RP2040 has ran some small amount of time
     //        reduces the delay(s) unreliable.
@@ -16,15 +25,22 @@ AmbientLightSensor::AmbientLightSensor(const char * task_name, uint32_t stack_de
     /// TODO: if this is the case, this should be done not just for ALS but for all tasks and thus by some dedicated operation.
 
     if (xTaskCreate(TASK_KONDOM(AmbientLightSensor, Task),
-                task_name,
-                stack_depth,
-                static_cast<void *>(this),
-                tskIDLE_PRIORITY + task_priority,
-                &m_task_handle) == pdTRUE) {
+            task_name,
+            stack_depth,
+            static_cast<void*>(this),
+            tskIDLE_PRIORITY + task_priority,
+            &m_task_handle)
+        == pdTRUE) {
         Logger::Log("Created task [{}]", task_name);
     } else {
         Logger::Log("Error: Failed to create task [{}]", task_name);
     }
+    m_timer_passive_measurement = xTimerCreate(
+        "ALS-Passive",
+        m_passive_measurement_period_ticks,
+        pdTRUE,
+        static_cast<void*>(m_measure_now),
+        PassiveMeasurementEvent);
 }
 
 void AmbientLightSensor::Initialize()
@@ -34,30 +50,46 @@ void AmbientLightSensor::Initialize()
     BH1750::Reset();
 }
 
-bool AmbientLightSensor::ReadLuxBlocking(float* lux)
+bool AmbientLightSensor::Measure()
 {
-    switch (BH1750::GetMode()) {
-    case POWER_DOWN:
-    case POWER_ON:
-    case ONE_TIME_MEDIUM:
-    case ONE_TIME_HIGH:
-    case ONE_TIME_LOW:
-        AdjustMeasurementResolution(MeasurementType::ONE_TIME);
-        break;
-    case CONTINUOUS_MEDIUM:
-    case CONTINUOUS_HIGH:
-    case CONTINUOUS_LOW:
-        AdjustMeasurementResolution(MeasurementType::CONTINUOUS);
-        break;
+    while (AdjustMeasurementResolution()) {
+        if (!ReadLuxBlocking()) {
+            return false;
+        }
     }
+    return true;
+}
+
+void AmbientLightSensor::MeasureOnce()
+{
+    if (Measure()) {
+        Logger::Log("Lux: {}: {}", BH1750::ModeString(BH1750::GetMode()), m_previous_measurement);
+        m_latest_lux->Overwrite(m_previous_measurement);
+    }
+    StopContinuousMeasurement();
+}
+
+void AmbientLightSensor::MeasureContinuously()
+{
+    while (!m_measure_continuously->Take(0)) {
+        if (Measure()) {
+            Logger::Log("Lux: {}: {}", BH1750::ModeString(BH1750::GetMode()), m_previous_measurement);
+            m_latest_lux->Overwrite(m_previous_measurement);
+        } else {
+            break;
+        }
+    }
+    StopContinuousMeasurement();
+}
+
+bool AmbientLightSensor::ReadLuxBlocking()
+{
     WaitForMeasurement();
     uint16_t measurement_data = BH1750::RESET_VALUE;
     if (!BH1750::ReadMeasurementData(&measurement_data)) {
-        Logger::Log("Warning: Failed to read indoor/outdoor sensor.");
         return false;
     }
-    *lux = Uint16ToLux(measurement_data);
-    m_previous_measurement = *lux;
+    m_previous_measurement = Uint16ToLux(measurement_data);
     return true;
 }
 
@@ -89,7 +121,7 @@ bool AmbientLightSensor::ReadLuxBlocking(float* lux)
  * (medium) HIGH: ~4340 < prev_measurement < ~8680
  * (bright) LOW:  ~8680 < prev_measurement
  */
-void AmbientLightSensor::AdjustMeasurementResolution(AmbientLightSensor::MeasurementType measurement_type)
+bool AmbientLightSensor::AdjustMeasurementResolution()
 {
     static const uint16_t EXPECTED_MAX_RAW_READ = 0b0101000101100001;
     static const auto ACCURACY_FACTOR = static_cast<float>(BH1750::ACCURACY_FACTOR);
@@ -99,39 +131,30 @@ void AmbientLightSensor::AdjustMeasurementResolution(AmbientLightSensor::Measure
     static const float MAX_HIGH = EXPECTED_MAX_RAW_READ / ACCURACY_FACTOR * MODE_FACTOR_HIGH / 2;
     static const float MAX_MEDIUM = EXPECTED_MAX_RAW_READ / ACCURACY_FACTOR * MODE_FACTOR_MEDIUM / 2;
 
-    m_resolution = MeasurementResolution::LOW;
+    auto new_mode = BH1750::Mode::CONTINUOUS_LOW;
     if (m_previous_measurement < MAX_HIGH) {
-        m_resolution = MeasurementResolution::HIGH;
+        new_mode = BH1750::Mode::CONTINUOUS_HIGH;
     } else if (m_previous_measurement < MAX_MEDIUM) {
-        m_resolution = MeasurementResolution::MEDIUM;
-    }
-    const auto new_mode = static_cast<BH1750::Mode>(measurement_type | m_resolution);
-    switch (new_mode) {
-    case BH1750::Mode::CONTINUOUS_MEDIUM:
-    case BH1750::Mode::CONTINUOUS_HIGH:
-    case BH1750::Mode::CONTINUOUS_LOW:
-    case BH1750::Mode::ONE_TIME_MEDIUM:
-    case BH1750::Mode::ONE_TIME_HIGH:
-    case BH1750::Mode::ONE_TIME_LOW:
-        break;
-    default:
-        Logger::Log("Error: Mode command {} | {} unfit for measuring",
-            static_cast<uint8_t>(measurement_type), static_cast<uint8_t>(m_resolution));
-        return;
+        new_mode = BH1750::Mode::CONTINUOUS_MEDIUM;
     }
     const BH1750::Mode prev_mode = BH1750::GetMode();
-    if (!BH1750::SetMode(new_mode)) {
-        Logger::Log("Warning: Failed to set ALS mode to {}", ModeString(new_mode));
-        return;
+    if (new_mode == prev_mode) {
+        return false;
     }
+    if (!BH1750::SetMode(new_mode)) {
+        return false;
+    }
+    m_measurement_mode = new_mode;
+    m_measurement_time = GetMeasurementTimeTicks();
     if (prev_mode == BH1750::Mode::POWER_DOWN || prev_mode == BH1750::Mode::POWER_ON) {
         MediateMeasurementTime();
     }
+    return true;
 }
 
 void AmbientLightSensor::WaitForMeasurement()
 {
-    xTaskDelayUntil(&m_measurement_started_at_ticks, GetMeasurementTimeTicks() + m_measurement_time_mediation);
+    xTaskDelayUntil(&m_measurement_started_at_ticks, m_measurement_time + m_measurement_time_mediation);
     m_measurement_time_mediation = 0;
 }
 
@@ -142,10 +165,10 @@ float AmbientLightSensor::Uint16ToLux(uint16_t u16) const
         const float measurement_time_factor = MEASUREMENT_TIME_REFERENCE_DEFAULT_FLOAT / static_cast<float>(BH1750::GetMeasurementTimeReferenceMs());
         lux *= measurement_time_factor;
     }
-    float mode_factor = MODE_FACTOR_MEDIUM;
-    if (m_resolution == MeasurementResolution::HIGH) {
-        mode_factor = MODE_FACTOR_HIGH;
-    } else if (m_resolution == MeasurementResolution::LOW) {
+    float mode_factor = MODE_FACTOR_HIGH;
+    if (m_measurement_mode == BH1750::Mode::CONTINUOUS_MEDIUM) {
+        mode_factor = MODE_FACTOR_MEDIUM;
+    } else if (m_measurement_mode == BH1750::Mode::CONTINUOUS_LOW) {
         mode_factor = MODE_FACTOR_LOW;
     }
     lux *= mode_factor;
@@ -164,26 +187,22 @@ float AmbientLightSensor::Uint16ToLux(uint16_t u16) const
 void AmbientLightSensor::MediateMeasurementTime()
 {
     m_measurement_started_at_ticks = xTaskGetTickCount();
-    m_measurement_time_mediation = GetMeasurementTimeTicks() / 2;
+    m_measurement_time_mediation = m_measurement_time / 2;
 }
 
 TickType_t AmbientLightSensor::GetMeasurementTimeTicks() const
 {
-    switch (m_resolution) {
-    case MEDIUM:
+    switch (m_measurement_mode) {
+    case BH1750::Mode::CONTINUOUS_MEDIUM:
         return static_cast<TickType_t>(MEASUREMENT_TIME_TYPICAL_TICKS_RES_MEDIUM * m_measurement_time_reference_factor);
-    case HIGH:
+    case BH1750::Mode::CONTINUOUS_HIGH:
         return static_cast<TickType_t>(MEASUREMENT_TIME_TYPICAL_TICKS_RES_HIGH * m_measurement_time_reference_factor);
-    case LOW:
+    case BH1750::Mode::CONTINUOUS_LOW:
         return static_cast<TickType_t>(MEASUREMENT_TIME_TYPICAL_TICKS_RES_LOW * m_measurement_time_reference_factor);
     default:
+        Logger::Log("Error: Called GetMeasurementTimeTicks even though not measuring.");
         return static_cast<TickType_t>(MEASUREMENT_TIME_TYPICAL_TICKS_RES_MEDIUM * m_measurement_time_reference_factor);
     }
-}
-
-void AmbientLightSensor::StartContinuousMeasurement()
-{
-    AdjustMeasurementResolution(AmbientLightSensor::CONTINUOUS);
 }
 
 void AmbientLightSensor::StopContinuousMeasurement()
@@ -219,40 +238,16 @@ void AmbientLightSensor::SetMeasurementTimeFactor(float factor)
 
 void AmbientLightSensor::Task()
 {
+    Logger::Log("Initiated");
     Initialize();
-
-    uint m_i = 0;
-    float measurement = 0;
-    const int cont_reads = 10;
-    float measurement_time_factor = 0.1;
-
+    MeasureOnce();
+    xTimerStart(m_timer_passive_measurement, portMAX_DELAY);
     while (true) {
-
-        uint64_t start = time_us_64();
-        ReadLuxBlocking(&measurement);
-        uint64_t stop = time_us_64();
-        Logger::Log("One time read #{}: {} in {} us", ++m_i, measurement, stop - start);
-
-        StartContinuousMeasurement();
-        start = time_us_64();
-
-        Logger::Log("{} continuous reads", cont_reads);
-        for (int cont_read_i = 0; cont_read_i < cont_reads; ++cont_read_i) {
-            if (ReadLuxBlocking(&measurement)) {
-                stop = time_us_64();
-                Logger::Log("Cont read #{}: {} in {} us", ++m_i, measurement, stop - start);
-                start = stop;
-            } else {
-                Logger::Log("Warning: Failed to receive lux measurement");
-            }
+        m_measure_now->Take(portMAX_DELAY);
+        if (m_measure_continuously->Take(0)) {
+            MeasureContinuously();
+        } else {
+            MeasureOnce();
         }
-        StopContinuousMeasurement();
-        ResetMeasurement();
-        SetMeasurementTimeFactor(measurement_time_factor);
-        measurement_time_factor += 0.1;
-        if (measurement_time_factor >= 4) {
-            measurement_time_factor = 0.1;
-        }
-
     }
 }
