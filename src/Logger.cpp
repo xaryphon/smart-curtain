@@ -1,23 +1,9 @@
 #include "Logger.hpp"
 
-#include <utility>
-
-#include <sys/unistd.h>
-
 #include "config.h"
 
-/// TODO: classify queue
-QueueHandle_t Logger::m_syslog_q;
-/// TODO: classify mutex
-SemaphoreHandle_t Logger::m_mutex;
-uint32_t Logger::m_lost_logs = 0;
-
-void Logger::Initialize()
-{
-    m_syslog_q = xQueueCreate(SYSLOG_QUEUE_LENGTH, sizeof(LogContent*));
-    m_mutex = xSemaphoreCreateMutex();
-    write(1, "\n", 1);
-}
+RTOS::Queue<Logger::LogContent>* Logger::s_syslog;
+RTOS::Counter* Logger::s_lost_logs;
 
 Logger::Logger(const char* task_name, uint32_t stack_depth, UBaseType_t priority)
 {
@@ -33,46 +19,41 @@ Logger::Logger(const char* task_name, uint32_t stack_depth, UBaseType_t priority
     } else {
         Logger::Log("Error: Failed to create task [{}]", task_name);
     }
+    s_syslog = new RTOS::Queue<LogContent>(SYSLOG_QUEUE_LENGTH, "SysLog");
+    Log("[Queue] '{}' created", s_syslog->Name());
+    s_lost_logs = new RTOS::Counter(LOST_LOGS_MAX, 0, "LostLogs");
 }
 
-void Logger::LogMessage(std::string msg)
+void Logger::LogMessage(const std::string& msg)
 {
-    auto* log = new LogContent(std::move(msg));
+    auto log = LogContent {
+        .timestamp = time_us_64(),
+        .task_name = GetTaskName(),
+        .msg = new std::string(msg)
+    };
     if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
-        xSemaphoreTake(m_mutex, portMAX_DELAY);
         LogToQueue(log);
-        xSemaphoreGive(m_mutex);
     } else {
-        log->PrintAndDelete();
+        PrintLogAndDeleteMsg(log);
     }
 }
 
-void Logger::LogToQueue(Logger::LogContent* log)
+void Logger::LogToQueue(Logger::LogContent log)
 {
-    if (xQueueSendToBack(m_syslog_q, &log, 0) != pdTRUE) {
-        delete log;
-        ++Logger::m_lost_logs;
+    if (!s_syslog->Append(log, 0)) {
+        s_lost_logs->Give();
+        delete log.msg;
     }
 }
 
-Logger::LogContent::LogContent(std::string log_msg)
-    : timestamp(time_us_64())
-    , task_name(GetTaskName())
-    , msg(std::move(log_msg))
+void Logger::PrintLogAndDeleteMsg(const Logger::LogContent& log_content)
 {
-}
-
-void Logger::LogContent::PrintAndDelete()
-{
-    const std::string log = fmt::format("[{}] [{}] {}\n",
-        FormatTime(timestamp),
-        task_name,
-        msg);
+    const std::string log = fmt::format("[{}] [{}] {}\n", FormatTime(log_content.timestamp), log_content.task_name, *log_content.msg);
     write(1, log.c_str(), log.size());
-    delete this;
+    delete log_content.msg;
 }
 
-const char* Logger::LogContent::GetTaskName()
+const char* Logger::GetTaskName()
 {
     const char* taskName = "Unknown";
     if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
@@ -87,7 +68,7 @@ const char* Logger::LogContent::GetTaskName()
 }
 
 /// TODO: with real time, perhaps date or day of the weak
-std::string Logger::LogContent::FormatTime(uint64_t time)
+std::string Logger::FormatTime(uint64_t time)
 {
     enum : uint64_t {
         us_in_ms = 1000,
@@ -111,22 +92,17 @@ void Logger::Task()
 {
     Logger::Log("Initiated");
     while (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
-        while (xQueueReceive(
-                   m_syslog_q,
-                   static_cast<void*>(&m_log),
-                   m_lost_logs > 0 ? 0 : portMAX_DELAY)
-            == pdTRUE) {
-            m_log->PrintAndDelete();
+        while (s_syslog->Receive(&m_log, s_lost_logs->Count() > 0 ? 0 : portMAX_DELAY)) {
+            PrintLogAndDeleteMsg(m_log);
         }
-        if (m_lost_logs > 0) {
-            Logger::Log("Warning: lost {} logs.", m_lost_logs);
-            xSemaphoreTake(m_mutex, portMAX_DELAY);
-            Logger::m_lost_logs = 0;
-            xSemaphoreGive(m_mutex);
+        if (s_lost_logs->Count() > 0) {
+            Logger::Log("Warning: lost {} logs.", s_lost_logs->Count());
+            s_lost_logs->Reset();
         }
     }
 }
 
+/// TODO: remove
 // With current setup, pico tends to panic at around log number #8000 with one stresser as it runs out of memory.
 void StressTask(void* params)
 {

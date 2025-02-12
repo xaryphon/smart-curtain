@@ -1,4 +1,3 @@
-#include <FreeRTOS.h>
 #include <task.h>
 
 #include "AmbientLightSensor.hpp"
