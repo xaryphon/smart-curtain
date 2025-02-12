@@ -3,6 +3,9 @@
 /// TODO: remove -- whole file can be deleted
 #include <FreeRTOS.h>
 #include <task.h>
+
+#include "Logger.hpp"
+
 struct TestItem {
     uint asd;
 };
