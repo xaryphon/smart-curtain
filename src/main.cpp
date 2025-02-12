@@ -5,6 +5,7 @@
 
 #include "AmbientLightSensor.hpp"
 #include "Logger.hpp"
+#include "Primitive.hpp"
 #include "example.h"
 
 extern "C" {
@@ -27,12 +28,14 @@ int main()
 
     auto example = Example::create();
     if (!example) {
-        //handle error
+        // handle error
         Logger::Log("Error: Failed to create [Example] task");
     }
     new Logger("Logger", DEFAULT_TASK_STACK_SIZE * 3, 1);
     new AmbientLightSensor("ALS-Indoor", DEFAULT_TASK_STACK_SIZE * 2, 3, i2c_1.get(), BH1750::I2CDevAddr::ADDR_LOW);
 
+    Logger::Log("Semaphores: {}", RTOS::Implementation::Primitive::GetSemaphoreCount());
+    Logger::Log("Queues: {}", RTOS::Implementation::Primitive::GetQueueCount());
     Logger::Log("Initializing Scheduler...");
     vTaskStartScheduler();
 }

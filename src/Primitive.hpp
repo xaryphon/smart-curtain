@@ -17,6 +17,8 @@ public:
 protected:
     static void IncrementSemaphoreCount();
     static void DecrementSemaphoreCount();
+    static void IncrementQueueCount();
+    static void DecrementQueueCount();
 
 private:
     static uint s_semaphore_count;
