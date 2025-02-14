@@ -5,6 +5,8 @@
 #include <lwip/tcpip.h>
 #include <netif/etharp.h>
 
+#include "config.h"
+
 static SemaphoreHandle_t g_W5500_Semaphore;
 static uint g_W5500_interrupt_pin;
 
@@ -87,7 +89,7 @@ err_t W5500LWIP::NetInit()
     m_netif.linkoutput = linkoutput;
     m_netif.mtu = 1500;
     m_netif.flags |= NETIF_FLAG_ETHARP | NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHERNET;
-    xTaskCreate([](void* param) { static_cast<decltype(this)>(param)->TaskEntry(); }, "W5500", 512, this, configMAX_PRIORITIES - 1, nullptr);
+    xTaskCreate(TASK_KONDOM(W5500LWIP, TaskEntry), "W5500", TaskStackSize::W5500LWIP, this, TaskPriority::W5500LWIP, nullptr);
 
     return ERR_OK;
 }
@@ -286,6 +288,7 @@ bool W5500LWIP::ReadFreeSize(uint16_t* free_size)
     return true;
 }
 
+#include <lwip/autoip.h>
 #include <lwip/dhcp.h>
 #include <pico/cyw43_arch.h>
 
@@ -301,7 +304,8 @@ void w5500_lwip_test_task(void* param)
     SPI* spi = new SPI(SPI::RX0::PIN_16, SPI::TX0::PIN_19, SPI::SCK0::PIN_18, 10'000'000);
     W5500LWIP* w5500 = new W5500LWIP(spi, SPI::CS(17), W5500::INT(15), W5500::RST(20));
 
-    dhcp_start(w5500->GetNetif());
+    //dhcp_start(w5500->GetNetif());
+    autoip_start(w5500->GetNetif());
 
     bool was_up = false;
     uint32_t last_ip = 0;
