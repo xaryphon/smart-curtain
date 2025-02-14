@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <string_view>
 
 #include <lwip/tcp.h>
 #include <picohttpparser.h>
@@ -27,10 +28,13 @@ private:
     [[nodiscard]] err_t SentCallback(u16_t len);
     void ErrorCallback(err_t err);
 
-    void SendResponse(const char* data);
+    void RespondWith(const char* status, const char* body);
     [[nodiscard]] size_t WriteToBuffer(const uint8_t* data, size_t len);
 
     [[nodiscard]] bool HandleRequest();
+
+    void HandleGET(std::string_view path);
+    void HandlePOST(std::string_view path, std::string_view body);
 
     tcp_pcb* m_pcb;
     bool m_tx_closed = false;
@@ -44,4 +48,8 @@ private:
     size_t m_path_len = 0;
     int m_minor_version = 0;
     std::array<phr_header, 128> m_headers = {};
+    size_t m_headers_size = 0;
+    size_t m_body_size = 0;
+
+    static size_t s_target_lux;
 };
