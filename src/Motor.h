@@ -21,28 +21,33 @@
 
 class Motor {
 public:
-    struct Infrastructure {
-        RTOS::Semaphore* move_now;
-        RTOS::Semaphore* measure_als_1;
-        RTOS::Semaphore* continous_lux_als_1;
-        RTOS::Semaphore* measure_als_2;
-        RTOS::Semaphore* continous_lux_als_2;
-        RTOS::Variable<float>* latest_lux;
-        RTOS::Variable<float>* target_lux;
-        RTOS::Variable<uint16_t>* belt_position;
-    };
-
     enum class PinStep : uint {};
     enum class PinDirection : uint {};
     enum class PinLimitCW : uint {};
     enum class PinLimitCCW : uint {};
 
-    static constexpr auto PIN_STEP = Motor::PinStep(10);
-    static constexpr auto PIN_DIRECTION = Motor::PinDirection(11);
-    static constexpr auto PIN_LIMIT_SWITCH_CW = Motor::PinLimitCW(12);
-    static constexpr auto PIN_LIMIT_SWITCH_CCW = Motor::PinLimitCCW(13);
+    enum Command : uint8_t {
+        OPEN_COMPLETELY = 0,
+        CLOSE_COMPLETELY = 100,
+        OPEN,
+        CLOSE,
+        CALIBRATE,
+    };
 
-    explicit Motor(const Infrastructure& infra, const char* name, PinStep step, PinDirection direction, PinLimitCW limit_cw, PinLimitCCW limit_ccw);
+    struct Parameters {
+        const char* name;
+
+        PinStep step;
+        PinDirection direction;
+        PinLimitCW limit_cw;
+        PinLimitCCW limit_ccw;
+
+        RTOS::Variable<Command>* v_command;
+        RTOS::Semaphore* s_control_auto;
+        RTOS::Variable<uint8_t>* v_belt_position;
+    };
+
+    explicit Motor(const Motor::Parameters& parameters);
 
 private:
     [[nodiscard]] bool IsCWLimitSwitchPressed() const;
@@ -50,14 +55,17 @@ private:
 
     bool StepCW();
     bool StepCCW();
-    bool Calibrate();
-
-    bool OnTarget();
-    void AdjustCurtain();
 
     void Task();
 
-    static constexpr uint EXPECTED_MAX_STEPS_ONE_WAY = 30'000;
+    bool Calibrate();
+    bool Open();
+    bool Close();
+    bool MoveTo();
+    void ConcludeCommand();
+
+    static constexpr int OUT_OF_BOUNDS_OPEN = 30'000;
+    static constexpr int OUT_OF_BOUNDS_CLOSE = -10'000;
     static constexpr TickType_t DIRECTION_CHANGE_DELAY_TICKS = pdMS_TO_TICKS(10);
 
     uint m_pin_step;
@@ -65,24 +73,17 @@ private:
     uint m_pin_limit_cw;
     uint m_pin_limit_ccw;
 
+    bool m_previous_direction;
     TickType_t m_step_finished = 0;
 
     TaskHandle_t m_handle = nullptr;
 
-    RTOS::Semaphore* m_s_move_now;
-    RTOS::Semaphore* m_s_measure_als_1;
-    RTOS::Semaphore* m_s_continous_lux_als_1;
-    RTOS::Semaphore* m_s_measure_als_2;
-    RTOS::Semaphore* m_s_continous_lux_als_2;
-    RTOS::Variable<float>* m_v_latest_lux;
-    RTOS::Variable<float>* m_v_target_lux;
-    RTOS::Variable<uint16_t>* m_v_belt_position;
+    RTOS::Variable<Command>* m_v_command;
+    RTOS::Semaphore* m_s_control_auto;
+    RTOS::Variable<uint8_t>* m_v_belt_position;
 
-    float m_latest_lux = 0;
-    float m_target_lux = 0;
-    float m_current_lux_difference = 0;
-    uint m_belt_position = 0;
+    Command m_command = CALIBRATE;
+    bool m_calibrated = false;
+    int m_belt_position = 0;
     uint m_belt_max = 0;
 };
-
-void test_motor();
