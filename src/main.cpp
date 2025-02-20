@@ -4,7 +4,9 @@
 #include <task.h>
 
 #include "AmbientLightSensor.hpp"
+#include "I2C.hpp"
 #include "Logger.hpp"
+#include "Motor.hpp"
 #include "Primitive.hpp"
 #include "example.h"
 
@@ -23,12 +25,8 @@ int main()
     Logger::Log("Boot");
 
     /// Serial Interfaces
-    auto i2c_1_sda = PicoW_I2C::SDA1Pin::SDA1_2;
-    auto i2c_1_scl = PicoW_I2C::SCL1Pin::SCL1_3;
-    auto i2c_1 = std::make_unique<PicoW_I2C>(i2c_1_sda, i2c_1_scl, BH1750::BAUDRATE_MAX);
-    auto i2c_0_sda = PicoW_I2C::SDA0Pin::SDA0_4;
-    auto i2c_0_scl = PicoW_I2C::SCL0Pin::SCL0_5;
-    auto i2c_0 = std::make_unique<PicoW_I2C>(i2c_0_sda, i2c_0_scl, BH1750::BAUDRATE_MAX);
+    const auto i2c_1 = std::make_unique<I2C>(I2C::SDA1::PIN_2, I2C::SCL1::PIN_3, BH1750::BAUDRATE_MAX);
+    const auto i2c_0 = std::make_unique<I2C>(I2C::SDA0::PIN_4, I2C::SCL0::PIN_5, BH1750::BAUDRATE_MAX);
 
     auto example = Example::create();
     if (!example) {
@@ -40,8 +38,8 @@ int main()
     auto* control_auto = new RTOS::Semaphore { "ControlAuto" };
 
     /// Variables
-    auto* als_1_lux_latest = new RTOS::Variable<float> { "ALS-1-LuxLatest" };
-    auto* als_2_lux_latest = new RTOS::Variable<float> { "ALS-2-LuxLatest" };
+    auto* latest_measurement_als1 = new RTOS::Variable<LuxMeasurement> { "ALS-1-LatestMeasurement" };
+    auto* latest_measurement_als2 = new RTOS::Variable<LuxMeasurement> { "ALS-2-LatestMeasurement" };
     auto* belt_position = new RTOS::Variable<uint8_t> { "BeltPosition" };
     auto* lux_target = new RTOS::Variable<float> { "LuxTarget" };
     auto* motor_command = new RTOS::Variable<Motor::Command> { "MotorAction" };
@@ -49,25 +47,14 @@ int main()
     /// Tasks
     new Logger("Logger", DEFAULT_TASK_STACK_SIZE * 3, 1);
     new AmbientLightSensor({
-        .name = "ALS-1",
+        .task_name = "ALS",
 
-        .i2c = i2c_1.get(),
-        .BH1750_i2c_address = BH1750::I2CDevAddr::ADDR_LOW,
+        .als1 = { "ALS-1", i2c_0.get(), BH1750::I2CDevAddr::LOW },
+        .als2 = { "ALS-2", i2c_1.get(), BH1750::I2CDevAddr::LOW },
 
-        .v_lux_latest_my = als_1_lux_latest,
-        .v_lux_latest_other = als_2_lux_latest,
-        .v_lux_target = lux_target,
-        .v_motor_command = motor_command,
-        .s_control_auto = control_auto,
-    });
-    new AmbientLightSensor({
-        .name = "ALS-2",
+        .v_latest_measurement_als1 = latest_measurement_als1,
+        .v_latest_measurement_als2 = latest_measurement_als2,
 
-        .i2c = i2c_0.get(),
-        .BH1750_i2c_address = BH1750::I2CDevAddr::ADDR_LOW,
-
-        .v_lux_latest_my = als_2_lux_latest,
-        .v_lux_latest_other = als_1_lux_latest,
         .v_lux_target = lux_target,
         .v_motor_command = motor_command,
         .s_control_auto = control_auto,
@@ -88,5 +75,6 @@ int main()
     Logger::Log("Semaphores: {}", RTOS::Implementation::Primitive::GetSemaphoreCount());
     Logger::Log("Queues: {}", RTOS::Implementation::Primitive::GetQueueCount());
     Logger::Log("Initializing Scheduler...");
+    sleep_us(1); // Ensure RTOS delay functionality
     vTaskStartScheduler();
 }
