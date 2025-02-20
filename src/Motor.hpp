@@ -1,9 +1,5 @@
 #pragma once
 
-#include <FreeRTOS.h>
-#include <pico/stdlib.h>
-#include <task.h>
-
 #include "Queue.hpp"
 #include "Semaphore.hpp"
 
@@ -21,17 +17,17 @@
 
 class Motor {
 public:
-    enum class PinStep : uint {};
-    enum class PinDirection : uint {};
-    enum class PinLimitCW : uint {};
-    enum class PinLimitCCW : uint {};
+    enum class PinStep : uint { };
+    enum class PinDirection : uint { };
+    enum class PinLimitCW : uint { };
+    enum class PinLimitCCW : uint { };
 
     enum Command : uint8_t {
         OPEN_COMPLETELY = 0,
         CLOSE_COMPLETELY = 100,
-        OPEN,
-        CLOSE,
-        CALIBRATE,
+        OPEN = 101,
+        CLOSE = 102,
+        CALIBRATE = 103,
     };
 
     struct Parameters {
@@ -47,7 +43,7 @@ public:
         RTOS::Variable<uint8_t>* v_belt_position;
     };
 
-    explicit Motor(const Motor::Parameters& parameters);
+    explicit Motor(const Parameters& parameters);
 
 private:
     [[nodiscard]] bool IsCWLimitSwitchPressed() const;

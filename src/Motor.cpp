@@ -1,6 +1,5 @@
-#include "Motor.h"
+#include "Motor.hpp"
 
-#include <FreeRTOS.h>
 #include <hardware/gpio.h>
 #include <task.h>
 
@@ -13,7 +12,7 @@ constexpr bool DIRECTION_CCW = false;
 constexpr uint STEP_HIGH_MS = 1;
 constexpr uint STEP_LOW_MS = 1;
 
-Motor::Motor(const Motor::Parameters& parameters)
+Motor::Motor(const Parameters& parameters)
     : m_pin_step(static_cast<uint>(parameters.step))
     , m_pin_direction(static_cast<uint>(parameters.direction))
     , m_pin_limit_cw(static_cast<uint>(parameters.limit_cw))
@@ -39,8 +38,9 @@ Motor::Motor(const Motor::Parameters& parameters)
 
     if (xTaskCreate(
             TASK_KONDOM(Motor, Task),
-            parameters.name, DEFAULT_TASK_STACK_SIZE * 2,
-            static_cast<void*>(this),
+            parameters.name,
+            DEFAULT_TASK_STACK_SIZE * 2,
+            this,
             tskIDLE_PRIORITY + 3,
             &m_handle)
         == pdTRUE) {
@@ -164,6 +164,7 @@ bool Motor::Calibrate()
         }
     }
     m_belt_max = m_belt_position;
+    m_v_belt_position->Overwrite(static_cast<uint8_t>(m_belt_position / m_belt_max * 100));
     Logger::Log("Calibrated. Max steps: {}", m_belt_max);
     return true;
 }
