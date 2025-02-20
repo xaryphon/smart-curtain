@@ -3,21 +3,20 @@
 // Renovated by Smart Curtains.
 //
 
-#include "PicoW_I2C.h"
+#include "I2C.hpp"
 
 #include <cstdio>
 #include <mutex>
 
 // #define DEBUG_PRINT_TASK
-
 #ifdef DEBUG_PRINT_TASK
-#include "DebugTask.h"
+#include "Logger.hpp"
 #endif
 
-PicoW_I2C* PicoW_I2C::i2c0_instance { nullptr };
-PicoW_I2C* PicoW_I2C::i2c1_instance { nullptr };
+I2C* I2C::i2c0_instance = nullptr;
+I2C* I2C::i2c1_instance = nullptr;
 
-void PicoW_I2C::IRQ_I2C0()
+void I2C::IRQ_I2C0()
 {
     if (i2c0_instance != nullptr) {
         i2c0_instance->ISR();
@@ -26,7 +25,7 @@ void PicoW_I2C::IRQ_I2C0()
     }
 }
 
-void PicoW_I2C::IRQ_I2C1()
+void I2C::IRQ_I2C1()
 {
     if (i2c1_instance != nullptr) {
         i2c1_instance->ISR();
@@ -35,37 +34,39 @@ void PicoW_I2C::IRQ_I2C1()
     }
 }
 
-PicoW_I2C::PicoW_I2C(SDA0Pin sda, SCL0Pin scl, uint baudrate)
-    : m_sda(sda)
-    , m_scl(scl)
+I2C::I2C(const SDA0& sda0, const SCL0& scl0, const uint& baudrate)
+    : m_sda(static_cast<uint>(sda0))
+    , m_scl(static_cast<uint>(scl0))
+    , m_baudrate(baudrate)
     , m_irqn(I2C0_IRQ)
     , m_irq_handler(IRQ_I2C0)
     , m_i2c(i2c0)
-    , m_baudrate(baudrate)
+    , m_access("I2C0-Access")
 {
     if (i2c0_instance != nullptr) {
-        printf("Warning: overwriting i2c0.\n");
+        abort();
     }
     i2c0_instance = this;
     Init();
 }
 
-PicoW_I2C::PicoW_I2C(SDA1Pin sda, SCL1Pin scl, uint baudrate)
-    : m_sda(sda)
-    , m_scl(scl)
+I2C::I2C(const SDA1& sda1, const SCL1& scl1, const uint& baudrate)
+    : m_sda(static_cast<uint>(sda1))
+    , m_scl(static_cast<uint>(scl1))
+    , m_baudrate(baudrate)
     , m_irqn(I2C1_IRQ)
     , m_irq_handler(IRQ_I2C1)
     , m_i2c(i2c1)
-    , m_baudrate(baudrate)
+    , m_access("I2C1-Access")
 {
     if (i2c1_instance != nullptr) {
-        printf("Warning: overwriting i2c1.\n");
+        abort();
     }
     i2c1_instance = this;
     Init();
 }
 
-void PicoW_I2C::Init()
+void I2C::Init() // NOLINT(readability-make-member-function-const)
 {
     gpio_init(m_scl);
     gpio_pull_up(m_scl);
@@ -78,13 +79,10 @@ void PicoW_I2C::Init()
     gpio_set_function(m_scl, GPIO_FUNC_I2C);
     // Set FIFO watermarks
     m_i2c->hw->tx_tl = 0; // TX_FIFO watermark to 0
-
-    /// Unsure what this does, and why it's hardcoded to 14.
-    /// Is this not supposed to be relative to pin and/or bus?
     m_i2c->hw->rx_tl = 14; // RX_FIFO watermark to 15 (manual gives impression that level is one higher than reg value)
 }
 
-void PicoW_I2C::FillTxFifo()
+void I2C::FillTxFifo()
 {
 #ifdef DEBUG_PRINT_TASK
     int fill { 0 };
@@ -111,11 +109,11 @@ void PicoW_I2C::FillTxFifo()
 #endif
     }
 #ifdef DEBUG_PRINT_TASK
-    DebugTask::debug("tx_fill: %d", fill);
+    Logger::Log("tx_fill: {}", fill);
 #endif
 }
 
-void PicoW_I2C::FillRxFifo()
+void I2C::FillRxFifo()
 {
 #ifdef DEBUG_PRINT_TASK
     int fill { 0 };
@@ -139,24 +137,24 @@ void PicoW_I2C::FillRxFifo()
     }
 
 #ifdef DEBUG_PRINT_TASK
-    DebugTask::debug("rx_fill: %d", fill);
+    Logger::Log("rx_fill: {}", fill);
 #endif
 }
 
-uint PicoW_I2C::Write(uint8_t addr, const uint8_t* buffer, uint length)
+uint I2C::Write(const uint8_t& addr, const uint8_t* buffer, const uint& length, const TickType_t& timeout_ticks)
 {
-    return Transaction(addr, buffer, length, nullptr, 0);
+    return Transaction(addr, buffer, length, nullptr, 0, timeout_ticks);
 }
 
-uint PicoW_I2C::Read(uint8_t addr, uint8_t* buffer, uint length)
+uint I2C::Read(const uint8_t& addr, uint8_t* buffer, const uint& length, const TickType_t& timeout_ticks)
 {
-    return Transaction(addr, nullptr, 0, buffer, length);
+    return Transaction(addr, nullptr, 0, buffer, length, timeout_ticks);
 }
 
-uint PicoW_I2C::Transaction(uint8_t addr, const uint8_t* wbuffer, uint wlength, uint8_t* rbuffer, uint rlength)
+uint I2C::Transaction(const uint8_t addr, const uint8_t* wbuffer, const uint wlength, uint8_t* rbuffer, const uint rlength, const TickType_t timeout_ticks)
 {
     assert((wbuffer && wlength > 0) || (rbuffer && rlength > 0));
-    std::lock_guard<Fmutex> const exclusive(m_access);
+    std::lock_guard const exclusive(m_access);
     m_task_to_notify = xTaskGetCurrentTaskHandle();
 
     m_i2c->hw->enable = 0;
@@ -182,9 +180,8 @@ uint PicoW_I2C::Transaction(uint8_t addr, const uint8_t* wbuffer, uint wlength, 
     // enable interrupts
     irq_set_enabled(m_irqn, true);
     // wait for stop interrupt
-    if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000)) == 0) {
+    if (ulTaskNotifyTake(pdTRUE, timeout_ticks) == 0) {
         // timed out
-        printf("timed out\n");
         count = 0;
     } else {
         count -= m_rcnt + m_wctr;
@@ -195,15 +192,17 @@ uint PicoW_I2C::Transaction(uint8_t addr, const uint8_t* wbuffer, uint wlength, 
     return count;
 }
 
-void PicoW_I2C::ISR()
+void I2C::ISR()
 {
     BaseType_t hpw = pdFALSE;
 #ifdef DEBUG_PRINT_TASK
+    /*
     DebugTask::debug("%d %d %d %d",
         !!(i2c->hw->raw_intr_stat & I2C_IC_RAW_INTR_STAT_STOP_DET_BITS),
         !!(i2c->hw->raw_intr_stat & I2C_IC_RAW_INTR_STAT_RX_FULL_BITS),
         !!(i2c->hw->raw_intr_stat & I2C_IC_RAW_INTR_STAT_TX_EMPTY_BITS),
         !!(i2c->hw->raw_intr_stat & I2C_IC_RAW_INTR_STAT_RX_OVER_BITS));
+    */
 #endif
     // See if we have active read and data available.
     // Read is paced writes to command register in master mode
@@ -221,7 +220,7 @@ void PicoW_I2C::ISR()
 #endif
     }
 #ifdef DEBUG_PRINT_TASK
-    DebugTask::debug("read: %d, %d", fill, rcnt);
+    // DebugTask::debug("read: %d, %d", fill, rcnt);
 #endif
 
     if ((m_i2c->hw->intr_stat & I2C_IC_INTR_MASK_M_TX_EMPTY_BITS) != 0U) {
