@@ -1,23 +1,39 @@
 #pragma once
 
 #include <array>
-#include <map>
-#include <memory>
 
-#include "PicoW_I2C.h"
-#include "config.h"
+#include "I2C.hpp"
 
 class BH1750 {
 public:
-    enum I2CDevAddr : uint8_t {
-        ADDR_LOW = 0x23,
-        ADDR_HIGH = 0x5C,
+    enum class I2CDevAddr : uint8_t {
+        LOW = 0x23,
+        HIGH = 0x5C,
     };
 
     static constexpr uint BAUDRATE_MAX = 400000;
-    static constexpr uint16_t RESET_VALUE = 0;
 
-protected:
+    struct Parameters {
+        const char* name;
+        I2C* i2c;
+        I2CDevAddr i2c_dev_addr;
+    };
+
+    explicit BH1750(const Parameters& parameters);
+
+    bool AdjustMeasurementResolution();
+    bool ReadLuxBlocking(float* lux);
+    void PowerDown();
+    void ResetMeasurement();
+    bool Reset();
+    bool SetMeasurementTimeReference(uint8_t measurement_time_reference_ms);
+
+    [[nodiscard]] const char* Name() const { return m_name; }
+    [[nodiscard]] const char* ModeString() const { return ModeString(m_mode); }
+
+    static constexpr uint8_t MEASUREMENT_TIME_REFERENCE_DEFAULT_MS = 69; // nice
+
+private:
     enum Operation : uint8_t {
         // clang-format off
         RESET               = 0b00000111,
@@ -44,36 +60,55 @@ protected:
         // clang-format on
     };
 
-    explicit BH1750(PicoW_I2C* picoI2C, BH1750::I2CDevAddr i2c_dev_addr);
-    bool SetMode(BH1750::Mode mode);
-    [[nodiscard]] BH1750::Mode GetMode() const { return m_mode; };
+    bool SetMode(const Mode& mode);
     bool ReadMeasurementData(uint16_t* data);
-    bool Reset();
-    bool SetMeasurementTimeReference(uint8_t measurement_time_reference_ms);
-    uint8_t GetMeasurementTimeReferenceMs() const { return m_measurement_time_reference_ms; };
-    static const char* ModeString(BH1750::Mode mode);
+    void AdjustMeasurementTime();
+    void MediateMeasurementTime();
+    void WaitForMeasurement();
+    [[nodiscard]] float Uint16ToLux(const uint16_t& u16) const;
+    static const char* ModeString(const Mode& mode);
+    [[nodiscard]] TickType_t GetMeasurementTimeReferenceMs() const { return pdMS_TO_TICKS(m_measurement_time_reference_ms); };
+
+    // I2C should time out faster than how long a measurement is expected to take,
+    // in order to avoid operational delays -- i.e. while motor is expecting updates.
+    [[nodiscard]] TickType_t I2CTimeoutTicks() const { return m_measurement_time / 2 + 1; }
 
     static constexpr uint8_t MEASUREMENT_TIME_REFERENCE_MIN_MS = 31;
-    static constexpr uint8_t MEASUREMENT_TIME_REFERENCE_DEFAULT_MS = 69; // nice
     static constexpr uint8_t MEASUREMENT_TIME_REFERENCE_MAX_MS = 254;
-
-    static const uint8_t MEASUREMENT_TIME_TYPICAL_RES_MEDIUM_MS = 120;
-    static const uint8_t MEASUREMENT_TIME_TYPICAL_RES_HIGH_MS = 120;
-    static const uint8_t MEASUREMENT_TIME_TYPICAL_RES_LOW_MS = 16;
+    static constexpr uint8_t MEASUREMENT_TIME_TYPICAL_RES_MEDIUM_MS = 120;
+    static constexpr uint8_t MEASUREMENT_TIME_TYPICAL_RES_HIGH_MS = 120;
+    static constexpr uint8_t MEASUREMENT_TIME_TYPICAL_RES_LOW_MS = 16;
 
     static constexpr float MODE_FACTOR_MEDIUM = 1;
     static constexpr float MODE_FACTOR_HIGH = 0.5;
     static constexpr float MODE_FACTOR_LOW = 4;
     static constexpr float ACCURACY_FACTOR = 1.2;
 
-private:
+    static constexpr uint16_t RESET_VALUE = 0;
+
     static constexpr size_t I2C_INSTRUCTION_BUF_LEN = sizeof(uint8_t);
     static constexpr size_t I2C_MEASUREMENT_BUF_LEN = sizeof(uint16_t);
 
-    PicoW_I2C* m_i2c;
-    BH1750::I2CDevAddr m_dev_addr;
+    static constexpr TickType_t MEASUREMENT_TIME_TYPICAL_TICKS_RES_MEDIUM = pdMS_TO_TICKS(MEASUREMENT_TIME_TYPICAL_RES_MEDIUM_MS);
+    static constexpr TickType_t MEASUREMENT_TIME_TYPICAL_TICKS_RES_HIGH = pdMS_TO_TICKS(MEASUREMENT_TIME_TYPICAL_RES_HIGH_MS);
+    static constexpr TickType_t MEASUREMENT_TIME_TYPICAL_TICKS_RES_LOW = pdMS_TO_TICKS(MEASUREMENT_TIME_TYPICAL_RES_LOW_MS);
+
+    static constexpr auto MEASUREMENT_TIME_REFERENCE_DEFAULT_FLOAT = static_cast<float>(BH1750::MEASUREMENT_TIME_REFERENCE_DEFAULT_MS);
+
+    const char* m_name;
+
+    I2C* m_i2c;
+    uint m_dev_addr;
     std::array<uint8_t, I2C_INSTRUCTION_BUF_LEN> m_write_buffer = {};
     std::array<uint8_t, I2C_MEASUREMENT_BUF_LEN> m_read_buffer = {};
-    BH1750::Mode m_mode = POWER_DOWN;
+    Mode m_mode = POWER_DOWN;
     uint8_t m_measurement_time_reference_ms = MEASUREMENT_TIME_REFERENCE_DEFAULT_MS;
+
+    TickType_t m_measurement_started_at_ticks = 0;
+
+    TickType_t m_measurement_time = MEASUREMENT_TIME_TYPICAL_TICKS_RES_MEDIUM;
+    TickType_t m_measurement_time_mediation = 0;
+    float m_measurement_time_reference_factor = MEASUREMENT_TIME_REFERENCE_DEFAULT_FLOAT / MEASUREMENT_TIME_REFERENCE_DEFAULT_FLOAT;
+
+    float m_lux_latest = RESET_VALUE;
 };
