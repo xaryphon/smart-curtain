@@ -1,6 +1,3 @@
-#include <FreeRTOS.h>
-#include <hardware/timer.h>
-#include <pico/stdlib.h>
 #include <task.h>
 
 #include "AmbientLightSensor.hpp"
@@ -8,7 +5,7 @@
 #include "Logger.hpp"
 #include "Motor.hpp"
 #include "Primitive.hpp"
-#include "example.h"
+#include "config.h"
 
 extern "C" {
 uint32_t read_runtime_ctr(void)
@@ -27,12 +24,6 @@ int main()
     /// Serial Interfaces
     const auto i2c_1 = std::make_unique<I2C>(I2C::SDA1::PIN_2, I2C::SCL1::PIN_3, BH1750::BAUDRATE_MAX);
     const auto i2c_0 = std::make_unique<I2C>(I2C::SDA0::PIN_4, I2C::SCL0::PIN_5, BH1750::BAUDRATE_MAX);
-
-    auto example = Example::create();
-    if (!example) {
-        // handle error
-        Logger::Log("Error: Failed to create [Example] task");
-    }
 
     /// Semaphores
     auto* control_auto = new RTOS::Semaphore { "ControlAuto" };

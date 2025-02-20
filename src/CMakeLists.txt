@@ -1,7 +1,6 @@
 target_sources(${PROJECT_NAME} PRIVATE
     AmbientLightSensor.cpp
     BH1750.cpp
-    example.cpp
     HttpConnection.cpp
     HttpServer.cpp
     Logger.cpp
