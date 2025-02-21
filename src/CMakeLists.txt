@@ -9,6 +9,7 @@ target_sources(${PROJECT_NAME} PRIVATE
     Motor.cpp
     Primitive.cpp
     Queue.cpp
+    RTC.cpp
     Semaphore.cpp
     SPI.cpp
     SPIDevice.cpp
