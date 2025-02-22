@@ -8,7 +8,7 @@ public:
     explicit RTC();
     explicit RTC(const datetime_t& time);
 
-    void Set(const datetime_t& time);
+    bool Set(const datetime_t& time);
     void SetAlarm(const datetime_t& time, const rtc_callback_t& callback);
 
     [[nodiscard]] datetime_t GetDatetime();

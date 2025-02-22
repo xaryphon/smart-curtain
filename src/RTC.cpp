@@ -17,13 +17,11 @@ RTC::RTC()
     s_initialized = true;
 }
 
-void RTC::Set(const datetime_t& time)
+bool RTC::Set(const datetime_t& time)
 {
     std::lock_guard exclusive(m_access);
     datetime_t t = time;
-    if (!rtc_set_datetime(&t)) {
-        Logger::Log("[RTC] Error: Failed to set time");
-    }
+    return rtc_set_datetime(&t);
 }
 
 void RTC::SetAlarm(const datetime_t& time, const rtc_callback_t& callback)
@@ -88,12 +86,12 @@ datetime_t RTC::Default()
         mon_in_y = 12,
 
         default_year = 2025,
-        default_month = 3,
-        default_day = 10,
-        default_weekday = 1,
-        default_hour = 10,
-        default_minute = 37,
-        default_sec = 22,
+        default_month = 2,
+        default_day = 28,
+        default_weekday = 5,
+        default_hour = 23,
+        default_minute = 59,
+        default_sec = 59,
     };
 
     const uint64_t sys_time_s = time_us_64() / us_in_s;
