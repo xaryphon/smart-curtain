@@ -1,0 +1,8 @@
+{
+  "domain": "smart_curtains",
+  "name": "Smart Curtains",
+  "version": "1.0.0",
+  "config_flow": true,
+  "requirements": ["requests"],
+  "iot_class": "local_polling"
+}
