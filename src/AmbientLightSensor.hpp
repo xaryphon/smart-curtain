@@ -9,7 +9,7 @@
 #include "Semaphore.hpp"
 
 struct LuxMeasurement {
-    uint64_t timestamp;
+    uint64_t timestamp; /// TODO: RT
     float lux;
 };
 
@@ -40,7 +40,7 @@ private:
     void StopMeasuring();
     [[nodiscard]] bool MotorAdjusting() const;
     void StopMotorAdjusting();
-    [[nodiscard]] bool ControlAuto() const { return m_s_control_auto->Count() == 0; }
+    [[nodiscard]] bool ControlAuto() const { return m_s_control_auto->Count() == 1; }
 
     BH1750 m_als1;
     BH1750 m_als2;
