@@ -48,21 +48,44 @@ Motor::Motor(const Parameters& parameters)
     } else {
         Logger::Log("Error: Failed to created task [{}]", parameters.name);
     }
+    m_s_control_auto->Take(0);
 }
 
-/// LEFT
+std::string Motor::CommandString(const Motor::Command& cmd)
+{
+    switch (cmd) {
+    case OPEN_COMPLETELY:
+        return "OPEN_COMPLETELY";
+    case CLOSE_COMPLETELY:
+        return "CLOSE_COMPLETELY";
+    case OPEN:
+        return "OPEN";
+    case CLOSE:
+        return "CLOSE";
+    case CALIBRATE:
+        return "CALIBRATE";
+    default:
+        if (OPEN_COMPLETELY < cmd && cmd < CLOSE_COMPLETELY) {
+            return fmt::format("{}%", static_cast<uint8_t>(cmd));
+        } else {
+            return "UNKNOWN";
+        }
+    }
+}
+
+/// RIGHT
 bool Motor::IsCWLimitSwitchPressed() const
 {
     return !gpio_get(m_pin_limit_cw);
 }
 
-/// RIGHT
+/// LEFT
 bool Motor::IsCCWLimitSwitchPressed() const
 {
     return !gpio_get(m_pin_limit_ccw);
 }
 
-/// LEFT
+/// RIGHT
 bool Motor::StepCW() // NOLINT(readability-make-member-function-const)
 {
     if (IsCWLimitSwitchPressed()) {
@@ -81,7 +104,7 @@ bool Motor::StepCW() // NOLINT(readability-make-member-function-const)
     return true;
 }
 
-/// RIGHT
+/// LEFT
 bool Motor::StepCCW() // NOLINT(readability-make-member-function-const)
 {
     if (IsCCWLimitSwitchPressed()) {
@@ -103,16 +126,15 @@ bool Motor::StepCCW() // NOLINT(readability-make-member-function-const)
 void Motor::Task()
 {
     Logger::Log("Initiated");
-    m_s_control_auto->Take(0);
-    m_calibrated = Calibrate();
-    if (!m_calibrated) {
+    Calibrate();
+    if (m_belt_max == 0) {
         m_s_control_auto->Take(0);
     } else {
         m_s_control_auto->Give();
     }
     while (true) {
         m_v_command->Peek(&m_command, portMAX_DELAY);
-        if (!m_calibrated && m_command != CALIBRATE) {
+        if (m_belt_max == 0 && m_command != CALIBRATE) {
             Logger::Log("Warning: Uncalibrated. Retracting command [{}]. Switching to manual.", static_cast<uint8_t>(m_command));
             m_s_control_auto->Take(0);
             m_v_command->Receive(&m_command, 0);
@@ -121,24 +143,28 @@ void Motor::Task()
         switch (m_command) {
         case OPEN_COMPLETELY:
         case OPEN:
-            m_calibrated = Open();
+            if (!Open()) {
+                m_belt_max = 0;
+            }
             break;
         case CLOSE_COMPLETELY:
         case CLOSE:
-            m_calibrated = Close();
+            if (!Close()) {
+                m_belt_max = 0;
+            }
+            break;
+        case STOP:
+            ConcludeCommand();
             break;
         case CALIBRATE:
-            m_calibrated = Calibrate();
+            Calibrate();
             ConcludeCommand();
-            if (!m_calibrated) {
-                m_s_control_auto->Take(0);
-            } else {
-                m_s_control_auto->Give();
-            }
             break;
         default:
             if (OPEN_COMPLETELY < m_command && m_command < CLOSE_COMPLETELY) {
-                m_calibrated = MoveTo();
+                if (!MoveTo()) {
+                    m_belt_max = 0;
+                }
             } else {
                 Logger::Log("Error: Unknown action command: {}", static_cast<uint8_t>(m_command));
                 m_v_command->Receive(&m_command, 0);
@@ -150,21 +176,22 @@ void Motor::Task()
 bool Motor::Calibrate()
 {
     Logger::Log("Calibrating...");
+    m_belt_position = 0;
     while (StepCW()) {
-        if (++m_belt_position > OUT_OF_BOUNDS_OPEN) {
+        if (++m_belt_position > OUT_OF_BOUNDS_CLOSE) {
             Logger::Log("Warning: CALIBRATE: CW LimitSW not found");
             return false;
         }
     }
     m_belt_position = 0;
     while (StepCCW()) {
-        if (++m_belt_position > OUT_OF_BOUNDS_OPEN) {
+        if (++m_belt_position > OUT_OF_BOUNDS_CLOSE) {
             Logger::Log("Warning: CALIBRATE: CCW LimitSW not found");
             return false;
         }
     }
     m_belt_max = m_belt_position;
-    m_v_belt_position->Overwrite(static_cast<uint8_t>(m_belt_position / m_belt_max * 100));
+    m_v_belt_position->Overwrite(BeltPosition());
     Logger::Log("Calibrated. Max steps: {}", m_belt_max);
     return true;
 }
@@ -173,12 +200,12 @@ bool Motor::Open()
 {
     if (!StepCW()) {
         ConcludeCommand();
-    } else if (m_belt_position > OUT_OF_BOUNDS_OPEN) {
+    } else if (m_belt_position < OUT_OF_BOUNDS_OPEN) {
         Logger::Log("Warning: OPEN out of bounds: {} / {}", m_belt_position, m_belt_max);
         return false;
     } else {
         --m_belt_position;
-        m_v_belt_position->Overwrite(static_cast<uint8_t>(m_belt_position / m_belt_max * 100));
+        m_v_belt_position->Overwrite(BeltPosition());
     }
     return true;
 }
@@ -187,19 +214,19 @@ bool Motor::Close()
 {
     if (!StepCCW()) {
         ConcludeCommand();
-    } else if (m_belt_position < OUT_OF_BOUNDS_CLOSE) {
+    } else if (m_belt_position > OUT_OF_BOUNDS_CLOSE) {
         Logger::Log("Warning: CLOSE out of bounds: {} / {}", m_belt_position, m_belt_max);
         return false;
     } else {
         ++m_belt_position;
-        m_v_belt_position->Overwrite(static_cast<uint8_t>(m_belt_position / m_belt_max * 100));
+        m_v_belt_position->Overwrite(BeltPosition());
     }
     return true;
 }
 
 bool Motor::MoveTo()
 {
-    const auto current_position = static_cast<uint8_t>(m_belt_position / m_belt_max * 100);
+    const auto current_position = BeltPosition();
     if (current_position < m_command) {
         return Close();
     }
@@ -221,4 +248,77 @@ void Motor::ConcludeCommand()
         // put it back
         m_v_command->Append(m_command, 0);
     }
+}
+
+/// TODO: remove
+
+void test_motor_commands_task(void* params)
+{
+    auto* cmd = static_cast<test_params*>(params)->cmd;
+    auto* control_auto = static_cast<test_params*>(params)->control_auto;
+    auto* target = static_cast<test_params*>(params)->target;
+
+    Logger::Log("Waiting for initial {} to finish", Motor::CommandString(Motor::Command::CALIBRATE));
+    control_auto->Take(portMAX_DELAY);
+    Logger::Log("Finished initial {}", Motor::CommandString(Motor::Command::CALIBRATE));
+    vTaskDelay(pdMS_TO_TICKS(10000));
+
+    auto new_command = Motor::Command { 50 };
+    cmd->Append(new_command, portMAX_DELAY);
+    Logger::Log("Commanded to {}", Motor::CommandString(new_command));
+
+    vTaskDelay(pdMS_TO_TICKS(15000));
+    auto prev_command = new_command;
+    new_command = Motor::CLOSE_COMPLETELY;
+    cmd->Overwrite(new_command);
+    Logger::Log("Overwrote {} command to {}", Motor::CommandString(prev_command), Motor::CommandString(new_command));
+    vTaskDelay(pdMS_TO_TICKS(10000));
+
+    new_command = Motor::Command { 75 };
+    cmd->Append(new_command, portMAX_DELAY);
+    Logger::Log("Commanded to {}", Motor::CommandString(new_command));
+
+    Logger::Log("Waiting for {} to finish...", Motor::CommandString(new_command));
+    cmd->Append(Motor::STOP, portMAX_DELAY);
+    Logger::Log("Finished {}", Motor::CommandString(new_command));
+    vTaskDelay(pdMS_TO_TICKS(10000));
+
+    new_command = Motor::Command::OPEN_COMPLETELY;
+    cmd->Append(new_command, portMAX_DELAY);
+    Logger::Log("Commanded to {}", Motor::CommandString(new_command));
+
+    Logger::Log("Waiting for {} to finish...", Motor::CommandString(new_command));
+    cmd->Append(Motor::STOP, portMAX_DELAY);
+    Logger::Log("Finished {}", Motor::CommandString(new_command));
+    vTaskDelay(pdMS_TO_TICKS(10000));
+
+    new_command = Motor::Command::CALIBRATE;
+    cmd->Append(new_command, portMAX_DELAY);
+    Logger::Log("Commanded to {}", Motor::CommandString(new_command));
+
+    Logger::Log("Waiting for {} to finish...", Motor::CommandString(new_command));
+    cmd->Append(Motor::STOP, portMAX_DELAY);
+    Logger::Log("Finished {}", Motor::CommandString(new_command));
+    vTaskDelay(pdMS_TO_TICKS(10000));
+
+    control_auto->Give();
+    Logger::Log("Manual -> Auto");
+
+    float new_target = 200;
+    target->Overwrite(new_target);
+    Logger::Log("Setting lux target to: {}", new_target);
+
+    vTaskDelay(pdMS_TO_TICKS(15000));
+    new_target = 100;
+    target->Overwrite(new_target);
+    Logger::Log("Setting lux target to: {}", new_target);
+
+    Logger::Log("Done");
+    vTaskDelay(portMAX_DELAY);
+}
+
+void test_motor_commands(const test_params& params)
+{
+    auto* p = new test_params(params);
+    xTaskCreate(test_motor_commands_task, "TestMotor", DEFAULT_TASK_STACK_SIZE * 4, p, tskIDLE_PRIORITY + 4, nullptr);
 }
