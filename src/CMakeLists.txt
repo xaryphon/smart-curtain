@@ -3,6 +3,8 @@ target_sources(${PROJECT_NAME} PRIVATE
     BH1750.cpp
     example.cpp
     Fmutex.cpp
+    HttpConnection.cpp
+    HttpServer.cpp
     Logger.cpp
     main.cpp
     Motor.cpp

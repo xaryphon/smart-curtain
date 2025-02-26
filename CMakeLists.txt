@@ -38,6 +38,7 @@ target_link_libraries(${PROJECT_NAME}
     hardware_adc
     hardware_spi
     pico_cyw43_arch_lwip_sys_freertos
+    picohttpparser
     pico_lwip_mbedtls
     pico_mbedtls
     pico_stdlib
