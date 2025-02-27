@@ -5,7 +5,7 @@ from homeassistant.helpers.typing import ConfigType
 from homeassistant.const import Platform
 from .cover import SmartCurtainCover
 
-PLATFORMS = [Platform.COVER]
+PLATFORMS = [Platform.COVER, Platform.SENSOR, Platform.NUMBER, Platform.SWITCH]
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     return True

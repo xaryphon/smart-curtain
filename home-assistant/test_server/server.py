@@ -1,10 +1,13 @@
 from flask import Flask, jsonify, request
 from math import copysign
+from random import random
 
 app = Flask(__name__)
 
 target = 0
 position = 0
+lux_target = 5000
+mode_auto = False
 
 def direction() -> int:
     diff = target - position
@@ -52,6 +55,36 @@ def move_curtains(position):
     global target
     target = position
     return jsonify(status_blob())
+
+@app.route('/als', methods=['GET'])
+def get_als():
+    return jsonify({'value': 100_000})
+
+@app.route('/target', methods=['GET'])
+def get_target():
+    return jsonify({'value': lux_target})
+
+@app.route('/target/<float:value>', methods=['POST'])
+def set_target(value):
+    global lux_target
+    lux_target = value
+    return jsonify({'value': lux_target})
+
+@app.route('/mode', methods=['GET'])
+def get_mode():
+    return jsonify({'mode': 'automatic' if mode_auto else 'manual'})
+
+@app.route('/mode/automatic', methods=['POST'])
+def enable_automatic_mode():
+    global mode_auto
+    mode_auto = True
+    return jsonify({'mode': 'automatic'})
+
+@app.route('/mode/manual', methods=['POST'])
+def disable_automatic_mode():
+    global mode_auto
+    mode_auto = False
+    return jsonify({'mode': 'manual'})
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=5000)
