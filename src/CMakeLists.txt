@@ -1,17 +1,15 @@
 target_sources(${PROJECT_NAME} PRIVATE
     AmbientLightSensor.cpp
     BH1750.cpp
-    example.cpp
-    Fmutex.cpp
     HttpConnection.cpp
     HttpServer.cpp
+    I2C.cpp
     Logger.cpp
     main.cpp
     Motor.cpp
     Primitive.cpp
     Queue.cpp
     Semaphore.cpp
-    PicoW_I2C.cpp
     SPI.cpp
     SPIDevice.cpp
     W5500.cpp

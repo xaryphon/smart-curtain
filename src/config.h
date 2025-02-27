@@ -8,6 +8,8 @@
 namespace TaskPriority {
     using Type = BaseType_t;
     enum : Type {
+        ALS = 3,
+        MOTOR = 3,
         W5500LWIP = 24,
     };
 } // namespace TaskPriority
@@ -15,6 +17,8 @@ namespace TaskPriority {
 namespace TaskStackSize {
     using Type = configSTACK_DEPTH_TYPE;
     enum : Type {
+        ALS = 1024,
+        MOTOR = 512,
         W5500LWIP = 512,
     };
 } // namespace TaskStackSize
