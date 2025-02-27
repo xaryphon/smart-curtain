@@ -139,7 +139,7 @@ bool BH1750::SetMeasurementTimeReference(uint8_t measurement_time_reference_ms)
 }
 
 /// Private
-bool BH1750::SetMode(const Mode& mode)
+bool BH1750::SetMode(const Mode mode)
 {
     if (m_mode == mode) {
         return true;
@@ -205,7 +205,7 @@ void BH1750::WaitForMeasurement()
     m_measurement_time_mediation = 0;
 }
 
-float BH1750::Uint16ToLux(const uint16_t& u16) const
+float BH1750::Uint16ToLux(const uint16_t u16) const
 {
     auto lux = static_cast<float>(u16);
     if (GetMeasurementTimeReferenceMs() != MEASUREMENT_TIME_REFERENCE_DEFAULT_MS) {
@@ -223,7 +223,7 @@ float BH1750::Uint16ToLux(const uint16_t& u16) const
     return lux;
 }
 
-const char* BH1750::ModeString(const Mode& mode)
+const char* BH1750::ModeString(const Mode mode)
 {
     switch (mode) {
     case POWER_DOWN:

@@ -16,9 +16,9 @@ AmbientLightSensor::AmbientLightSensor(const Parameters& parameters)
 {
     if (xTaskCreate(TASK_KONDOM(AmbientLightSensor, Task),
             parameters.task_name,
-            DEFAULT_TASK_STACK_SIZE * 3,
+            TaskStackSize::ALS,
             this,
-            tskIDLE_PRIORITY + 3,
+            TaskPriority::ALS,
             &m_task_handle)
         == pdTRUE) {
         Logger::Log("Created task [{}]", parameters.task_name);

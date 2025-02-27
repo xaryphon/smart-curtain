@@ -60,13 +60,13 @@ private:
         // clang-format on
     };
 
-    bool SetMode(const Mode& mode);
+    bool SetMode(Mode mode);
     bool ReadMeasurementData(uint16_t* data);
     void AdjustMeasurementTime();
     void MediateMeasurementTime();
     void WaitForMeasurement();
-    [[nodiscard]] float Uint16ToLux(const uint16_t& u16) const;
-    static const char* ModeString(const Mode& mode);
+    [[nodiscard]] float Uint16ToLux(uint16_t u16) const;
+    static const char* ModeString(Mode mode);
     [[nodiscard]] TickType_t GetMeasurementTimeReferenceMs() const { return pdMS_TO_TICKS(m_measurement_time_reference_ms); };
 
     // I2C should time out faster than how long a measurement is expected to take,

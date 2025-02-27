@@ -47,7 +47,7 @@ public:
     };
 
     explicit Motor(const Parameters& parameters);
-    [[nodiscard]] static std::string CommandString(const Motor::Command& cmd);
+    [[nodiscard]] static std::string CommandString(Motor::Command cmd);
 
 private:
     [[nodiscard]] bool IsCWLimitSwitchPressed() const;
@@ -89,7 +89,6 @@ private:
 };
 
 /// TODO: Remove
-///
 struct test_params {
     RTOS::Variable<Motor::Command>* cmd;
     RTOS::Semaphore* control_auto;

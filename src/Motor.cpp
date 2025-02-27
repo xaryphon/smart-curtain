@@ -39,9 +39,9 @@ Motor::Motor(const Parameters& parameters)
     if (xTaskCreate(
             TASK_KONDOM(Motor, Task),
             parameters.name,
-            DEFAULT_TASK_STACK_SIZE * 2,
+            TaskPriority::MOTOR,
             this,
-            tskIDLE_PRIORITY + 3,
+            TaskPriority::MOTOR,
             &m_handle)
         == pdTRUE) {
         Logger::Log("Created task [{}]", parameters.name);
@@ -51,7 +51,7 @@ Motor::Motor(const Parameters& parameters)
     m_s_control_auto->Take(0);
 }
 
-std::string Motor::CommandString(const Motor::Command& cmd)
+std::string Motor::CommandString(const Motor::Command cmd)
 {
     switch (cmd) {
     case OPEN_COMPLETELY:
@@ -137,7 +137,7 @@ void Motor::Task()
         if (m_belt_max == 0 && m_command != CALIBRATE) {
             Logger::Log("Warning: Uncalibrated. Retracting command [{}]. Switching to manual.", static_cast<uint8_t>(m_command));
             m_s_control_auto->Take(0);
-            m_v_command->Receive(&m_command, 0);
+            ConcludeCommand();
             continue;
         }
         switch (m_command) {
