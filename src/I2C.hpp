@@ -50,16 +50,16 @@ public:
         PIN_27 = 27,
     };
 
-    explicit I2C(const SDA1& sda, const SCL1& scl, const uint& baudrate);
-    explicit I2C(const SDA0& sda, const SCL0& scl, const uint& baudrate);
+    explicit I2C(SDA1 sda, SCL1 scl, uint baudrate);
+    explicit I2C(SDA0 sda, SCL0 scl, uint baudrate);
     I2C(const I2C&) = delete;
     I2C(I2C&&) = delete;
     I2C& operator=(const I2C&) = delete;
     I2C& operator=(I2C&&) = delete;
 
     void Init();
-    uint Write(const uint8_t& addr, const uint8_t* buffer, const uint& length, const TickType_t& timeout_ticks);
-    uint Read(const uint8_t& addr, uint8_t* buffer, const uint& length, const TickType_t& timeout_ticks);
+    uint Write(uint8_t addr, const uint8_t* buffer, uint length, TickType_t timeout_ticks);
+    uint Read(uint8_t addr, uint8_t* buffer, uint length, TickType_t timeout_ticks);
     uint Transaction(uint8_t addr, const uint8_t* wbuffer, uint wlength, uint8_t* rbuffer, uint rlength, TickType_t timeout_ticks);
 
 private:

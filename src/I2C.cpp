@@ -34,7 +34,7 @@ void I2C::IRQ_I2C1()
     }
 }
 
-I2C::I2C(const SDA0& sda0, const SCL0& scl0, const uint& baudrate)
+I2C::I2C(const SDA0 sda0, const SCL0 scl0, const uint baudrate)
     : m_sda(static_cast<uint>(sda0))
     , m_scl(static_cast<uint>(scl0))
     , m_baudrate(baudrate)
@@ -50,7 +50,7 @@ I2C::I2C(const SDA0& sda0, const SCL0& scl0, const uint& baudrate)
     Init();
 }
 
-I2C::I2C(const SDA1& sda1, const SCL1& scl1, const uint& baudrate)
+I2C::I2C(const SDA1 sda1, const SCL1 scl1, const uint baudrate)
     : m_sda(static_cast<uint>(sda1))
     , m_scl(static_cast<uint>(scl1))
     , m_baudrate(baudrate)
@@ -141,12 +141,12 @@ void I2C::FillRxFifo()
 #endif
 }
 
-uint I2C::Write(const uint8_t& addr, const uint8_t* buffer, const uint& length, const TickType_t& timeout_ticks)
+uint I2C::Write(const uint8_t addr, const uint8_t* buffer, const uint length, const TickType_t timeout_ticks)
 {
     return Transaction(addr, buffer, length, nullptr, 0, timeout_ticks);
 }
 
-uint I2C::Read(const uint8_t& addr, uint8_t* buffer, const uint& length, const TickType_t& timeout_ticks)
+uint I2C::Read(const uint8_t addr, uint8_t* buffer, const uint length, const TickType_t timeout_ticks)
 {
     return Transaction(addr, nullptr, 0, buffer, length, timeout_ticks);
 }
