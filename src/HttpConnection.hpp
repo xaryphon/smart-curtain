@@ -33,6 +33,7 @@ private:
 
     [[nodiscard]] bool HandleRequest();
 
+    std::string BuildBody(bool include_status, bool include_settings);
     void HandleGET(std::string_view path);
     void HandlePOST(std::string_view path, std::string_view body);
 
@@ -50,6 +51,4 @@ private:
     std::array<phr_header, 128> m_headers = {};
     size_t m_headers_size = 0;
     size_t m_body_size = 0;
-
-    static size_t s_target_lux;
 };

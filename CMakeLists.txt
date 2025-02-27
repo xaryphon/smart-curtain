@@ -32,6 +32,7 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
 )
 
 target_link_libraries(${PROJECT_NAME}
+    ArduinoJson
     fmt::fmt
     FreeRTOS-Kernel-Heap4
     hardware_i2c

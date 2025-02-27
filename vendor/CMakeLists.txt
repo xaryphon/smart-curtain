@@ -30,3 +30,12 @@ CPMAddPackage(
 )
 add_library(picohttpparser STATIC ${picohttpparser_SOURCE_DIR}/picohttpparser.c)
 target_include_directories(picohttpparser PUBLIC ${picohttpparser_SOURCE_DIR})
+
+
+CPMAddPackage(
+    NAME ArduinoJson
+    GIT_REPOSITORY https://github.com/bblanchon/ArduinoJson.git
+    GIT_TAG 8f7e793f37bff2ebcc806e92245f1540452ef9f3 # v7.3.0
+    OPTIONS
+    "BUILD_TESTING OFF"
+)
