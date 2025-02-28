@@ -44,9 +44,9 @@ public:
 private:
     static void PrintLogAndDeleteMsg(const LogContent& log_content);
     static const char* GetTaskName();
-    static std::string FormatTime(datetime_t dt);
+    static std::string FormatTime(const datetime_t& dt);
     static void LogMessage(const std::string& msg);
-    static void LogToQueue(LogContent log);
+    static void LogToQueue(const LogContent& log);
     void Task();
 
     static constexpr UBaseType_t SYSLOG_QUEUE_LENGTH = 20;

@@ -22,9 +22,9 @@ Logger::Logger(const Constructors& constructors)
     if (xTaskCreate(
             TASK_KONDOM(Logger, Task),
             constructors.task_name,
-            DEFAULT_TASK_STACK_SIZE * 3,
+            TaskStackSize::LOGGER,
             this,
-            tskIDLE_PRIORITY + 1,
+            TaskPriority::LOGGER,
             &m_task_handle)
         == pdPASS) {
         Log("Created task [{}]", constructors.task_name);
@@ -49,7 +49,7 @@ void Logger::LogMessage(const std::string& msg)
     }
 }
 
-void Logger::LogToQueue(LogContent log)
+void Logger::LogToQueue(const LogContent& log)
 {
     if (!s_syslog->Append(log, 0)) {
         s_lost_logs->Give();
@@ -81,7 +81,7 @@ const char* Logger::GetTaskName()
     return taskName;
 }
 
-std::string Logger::FormatTime(datetime_t dt)
+std::string Logger::FormatTime(const datetime_t& dt)
 {
     if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
         return fmt::format("{} {:0>2}.{:0>2}.{} {:0>2}:{:0>2}:{:0>2}",
@@ -99,7 +99,7 @@ std::string Logger::FormatTime(datetime_t dt)
     };
     const uint64_t us = time_us_64();
     return fmt::format("{:0>2}:{:0>2}:{:0>2}:{:0>3}:{:0>3}",
-        us / us_in_h % h_in_d,
+        us / us_in_h,
         us / us_in_m % m_in_h,
         us / us_in_s % s_in_m,
         us / us_in_ms % ms_in_s,
