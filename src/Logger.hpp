@@ -3,7 +3,6 @@
 #include <cstdarg>
 #include <cstring>
 #include <memory>
-#include <utility>
 
 #include <FreeRTOS.h>
 #include <fmt/core.h>
@@ -17,15 +16,9 @@
 
 class Logger {
 public:
-    enum LogTimeDetails : uint8_t {
-        NONE = 0,
-        S_FRACTIONS = 1,
-        DATE = 2,
-    };
 
     struct Initializers {
         RTC* rtc;
-        RTOS::Variable<LogTimeDetails>* log_time_details;
     };
 
     static void Initialize(const Initializers& initializers);
@@ -44,8 +37,6 @@ public:
 
     struct LogContent {
         datetime_t datetime;
-        uint16_t ms;
-        uint16_t us;
         const char* task_name;
         std::string* msg;
     };
@@ -53,7 +44,7 @@ public:
 private:
     static void PrintLogAndDeleteMsg(const LogContent& log_content);
     static const char* GetTaskName();
-    static std::string FormatTime(datetime_t dt, uint16_t ms, uint16_t us);
+    static std::string FormatTime(datetime_t dt);
     static void LogMessage(const std::string& msg);
     static void LogToQueue(LogContent log);
     void Task();

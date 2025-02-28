@@ -19,8 +19,7 @@ uint32_t read_runtime_ctr(void)
 int main()
 {
     auto* rtc = new RTC();
-    auto* log_time_details = new RTOS::Variable<Logger::LogTimeDetails>("LogTimeDetails");
-    Logger::Initialize({ .rtc = rtc, .log_time_details = log_time_details });
+    Logger::Initialize({ .rtc = rtc });
     Logger::Log("Boot");
 
     /// Serial Interfaces

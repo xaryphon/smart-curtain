@@ -8,16 +8,12 @@
 RTOS::Queue<Logger::LogContent>* Logger::s_syslog;
 RTOS::Counter* Logger::s_lost_logs;
 RTC* Logger::s_rtc;
-RTOS::Variable<Logger::LogTimeDetails>* s_log_time_details;
 
 void Logger::Initialize(const Initializers& initializers)
 {
     const bool stdio_initialized = stdio_init_all();
     assert(stdio_initialized);
     s_rtc = initializers.rtc;
-    s_log_time_details = initializers.log_time_details;
-    constexpr auto initial_settings = static_cast<LogTimeDetails>(S_FRACTIONS | DATE);
-    s_log_time_details->Overwrite(initial_settings);
     write(1, "\n", 1);
 }
 
@@ -41,11 +37,8 @@ Logger::Logger(const Constructors& constructors)
 
 void Logger::LogMessage(const std::string& msg)
 {
-    const uint64_t sys_time = time_us_64();
     auto log = LogContent {
         .datetime = s_rtc->GetDatetime(),
-        .ms = static_cast<uint16_t>(sys_time / 1000 % 1000),
-        .us = static_cast<uint16_t>(sys_time % 1000),
         .task_name = GetTaskName(),
         .msg = new std::string(msg)
     };
@@ -67,7 +60,7 @@ void Logger::LogToQueue(LogContent log)
 void Logger::PrintLogAndDeleteMsg(const LogContent& log_content)
 {
     const std::string log = fmt::format("[{}] [{}] {}\n",
-        FormatTime(log_content.datetime, log_content.ms, log_content.us),
+        FormatTime(log_content.datetime),
         log_content.task_name,
         *log_content.msg);
     write(1, log.c_str(), log.size());
@@ -88,18 +81,29 @@ const char* Logger::GetTaskName()
     return taskName;
 }
 
-std::string Logger::FormatTime(datetime_t dt, uint16_t ms, uint16_t us)
+std::string Logger::FormatTime(datetime_t dt)
 {
-    std::string str = "";
-    LogTimeDetails settings = NONE;
-    if (s_log_time_details->Peek(&settings, 0) && settings & DATE) {
-        str = fmt::format("{} {:0>2}.{:0>2}.{} ", s_rtc->DayOfWeekString(dt), dt.day, dt.month, dt.year);
+    if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
+        return fmt::format("{} {:0>2}.{:0>2}.{} {:0>2}:{:0>2}:{:0>2}",
+            s_rtc->DayOfWeekString(dt), dt.day, dt.month, dt.year, dt.hour, dt.min, dt.sec);
     }
-    str += fmt::format("{:0>2}:{:0>2}:{:0>2}", dt.hour, dt.min, dt.sec);
-    if (settings & S_FRACTIONS) {
-        str += fmt::format(":{:0>3}:{:0>3}", ms, us);
-    }
-    return str;
+    enum : uint64_t {
+        us_in_ms = 1000,
+        ms_in_s = 1000,
+        us_in_s = us_in_ms * ms_in_s,
+        s_in_m = 60,
+        us_in_m = us_in_s * s_in_m,
+        m_in_h = 60,
+        us_in_h = us_in_m * m_in_h,
+        h_in_d = 24
+    };
+    const uint64_t us = time_us_64();
+    return fmt::format("{:0>2}:{:0>2}:{:0>2}:{:0>3}:{:0>3}",
+        us / us_in_h % h_in_d,
+        us / us_in_m % m_in_h,
+        us / us_in_s % s_in_m,
+        us / us_in_ms % ms_in_s,
+        us % us_in_ms);
 }
 
 void Logger::Task()
