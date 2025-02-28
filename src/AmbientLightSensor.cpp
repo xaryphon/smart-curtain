@@ -74,7 +74,7 @@ bool AmbientLightSensor::Measure()
     } while (StartMeasuring());
     if (als1_working) {
         m_v_measurement_als_1->Overwrite(m_measurement_als1);
-        Logger::Log("[{}}: {} lux", m_als1.Name(), m_measurement_als1.lux);
+        Logger::Log("[{}]: {} lux", m_als1.Name(), m_measurement_als1.lux);
         m_lux_average = m_measurement_als1.lux;
     }
     if (als2_working) {

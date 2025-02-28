@@ -39,7 +39,7 @@ Motor::Motor(const Parameters& parameters)
     if (xTaskCreate(
             TASK_KONDOM(Motor, Task),
             parameters.name,
-            TaskPriority::MOTOR,
+            TaskStackSize::MOTOR,
             this,
             TaskPriority::MOTOR,
             &m_handle)
