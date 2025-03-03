@@ -35,7 +35,7 @@ target_link_libraries(${PROJECT_NAME}
     fmt::fmt
     FreeRTOS-Kernel-Heap4
     hardware_i2c
-    hardware_adc
+    hardware_rtc
     hardware_spi
     pico_cyw43_arch_lwip_sys_freertos
     picohttpparser

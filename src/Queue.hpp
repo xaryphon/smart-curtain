@@ -1,8 +1,8 @@
 #pragma once
 
 #include <string>
+#include <utility>
 
-#include "Logger.hpp"
 #include "Primitive.hpp"
 
 namespace RTOS {
@@ -17,7 +17,6 @@ public:
         , m_queue_length(length)
     {
         assert(length > 1);
-        Logger::Log("[{}] '{}' created", TYPE, Name());
         Implementation::Primitive::IncrementQueueCount();
     }
 
@@ -82,7 +81,6 @@ public:
     explicit Variable(const char* name)
         : Base(name)
     {
-        Logger::Log("[{}] '{}' created", TYPE, Base::Name());
     }
 
     void Overwrite(ItemType item) { xQueueOverwrite(this->Handle(), &item); }

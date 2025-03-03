@@ -1,4 +1,5 @@
 #include <FreeRTOS.h>
+#include <pico/stdlib.h>
 #include <task.h>
 
 #include "AmbientLightSensor.hpp"
@@ -17,9 +18,8 @@ uint32_t read_runtime_ctr(void)
 
 int main()
 {
-    const bool stdio_initialized = stdio_init_all();
-    assert(stdio_initialized);
-    Logger::Initialize();
+    auto* rtc = new RTC();
+    Logger::Initialize({ .rtc = rtc });
     Logger::Log("Boot");
 
     /// Serial Interfaces
@@ -37,7 +37,7 @@ int main()
     auto* motor_command = new RTOS::Variable<Motor::Command> { "MotorAction" };
 
     /// Tasks
-    new Logger("Logger", DEFAULT_TASK_STACK_SIZE * 3, 1);
+    new Logger({ .task_name = "Logger" });
     new AmbientLightSensor({
         .task_name = "ALS",
 

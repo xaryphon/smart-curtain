@@ -28,7 +28,6 @@ SemaphoreHandler::SemaphoreHandler(SemaphoreHandle_t handle, const char* type, c
 {
     assert(m_handle);
     Primitive::IncrementSemaphoreCount();
-    Logger::Log("[{}] '{}' created", type, m_name);
 }
 } // namespace RTOS::Implementation
 

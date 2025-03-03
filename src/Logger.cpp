@@ -1,78 +1,73 @@
 #include "Logger.hpp"
 
-#include <utility>
-
-#include <sys/unistd.h>
+#include <hardware/timer.h>
+#include <pico/stdio.h>
 
 #include "config.h"
 
-/// TODO: classify queue
-QueueHandle_t Logger::m_syslog_q;
-/// TODO: classify mutex
-SemaphoreHandle_t Logger::m_mutex;
-uint32_t Logger::m_lost_logs = 0;
+RTOS::Queue<Logger::LogContent>* Logger::s_syslog;
+RTOS::Counter* Logger::s_lost_logs;
+RTC* Logger::s_rtc;
 
-void Logger::Initialize()
+void Logger::Initialize(const Initializers& initializers)
 {
-    m_syslog_q = xQueueCreate(SYSLOG_QUEUE_LENGTH, sizeof(LogContent*));
-    m_mutex = xSemaphoreCreateMutex();
+    const bool stdio_initialized = stdio_init_all();
+    assert(stdio_initialized);
+    s_rtc = initializers.rtc;
     write(1, "\n", 1);
 }
 
-Logger::Logger(const char* task_name, uint32_t stack_depth, UBaseType_t priority)
+Logger::Logger(const Constructors& constructors)
 {
     if (xTaskCreate(
             TASK_KONDOM(Logger, Task),
-            task_name,
-            stack_depth,
-            static_cast<void*>(this),
-            tskIDLE_PRIORITY + priority,
+            constructors.task_name,
+            TaskStackSize::LOGGER,
+            this,
+            TaskPriority::LOGGER,
             &m_task_handle)
         == pdPASS) {
-        Logger::Log("Created task [{}]", task_name);
+        Log("Created task [{}]", constructors.task_name);
     } else {
-        Logger::Log("Error: Failed to create task [{}]", task_name);
+        Log("Error: Failed to create task [{}]", constructors.task_name);
     }
+    s_syslog = new RTOS::Queue<LogContent>(SYSLOG_QUEUE_LENGTH, "SysLog");
+    s_lost_logs = new RTOS::Counter(LOST_LOGS_MAX, 0, "LostLogs");
 }
 
-void Logger::LogMessage(std::string msg)
+void Logger::LogMessage(std::string&& msg)
 {
-    auto* log = new LogContent(std::move(msg));
+    auto log = LogContent {
+        .datetime = s_rtc->GetDatetime(),
+        .task_name = GetTaskName(),
+        .msg = new std::string(std::move(msg))
+    };
     if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
-        xSemaphoreTake(m_mutex, portMAX_DELAY);
         LogToQueue(log);
-        xSemaphoreGive(m_mutex);
     } else {
-        log->PrintAndDelete();
+        PrintLogAndDeleteMsg(log);
     }
 }
 
-void Logger::LogToQueue(Logger::LogContent* log)
+void Logger::LogToQueue(const LogContent& log)
 {
-    if (xQueueSendToBack(m_syslog_q, &log, 0) != pdTRUE) {
-        delete log;
-        ++Logger::m_lost_logs;
+    if (!s_syslog->Append(log, 0)) {
+        s_lost_logs->Give();
+        delete log.msg;
     }
 }
 
-Logger::LogContent::LogContent(std::string log_msg)
-    : timestamp(time_us_64())
-    , task_name(GetTaskName())
-    , msg(std::move(log_msg))
-{
-}
-
-void Logger::LogContent::PrintAndDelete()
+void Logger::PrintLogAndDeleteMsg(const LogContent& log_content)
 {
     const std::string log = fmt::format("[{}] [{}] {}\n",
-        FormatTime(timestamp),
-        task_name,
-        msg);
+        FormatTime(log_content.datetime),
+        log_content.task_name,
+        *log_content.msg);
     write(1, log.c_str(), log.size());
-    delete this;
+    delete log_content.msg;
 }
 
-const char* Logger::LogContent::GetTaskName()
+const char* Logger::GetTaskName()
 {
     const char* taskName = "Unknown";
     if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
@@ -86,47 +81,46 @@ const char* Logger::LogContent::GetTaskName()
     return taskName;
 }
 
-/// TODO: with real time, perhaps date or day of the weak
-std::string Logger::LogContent::FormatTime(uint64_t time)
+std::string Logger::FormatTime(const datetime_t& dt)
 {
+    if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
+        return fmt::format("{} {:0>2}.{:0>2}.{} {:0>2}:{:0>2}:{:0>2}",
+            s_rtc->DayOfWeekString(dt), dt.day, dt.month, dt.year, dt.hour, dt.min, dt.sec);
+    }
     enum : uint64_t {
         us_in_ms = 1000,
         ms_in_s = 1000,
+        us_in_s = us_in_ms * ms_in_s,
         s_in_m = 60,
-        ms_in_m = ms_in_s * s_in_m,
+        us_in_m = us_in_s * s_in_m,
         m_in_h = 60,
-        ms_in_h = ms_in_m * m_in_h,
+        us_in_h = us_in_m * m_in_h,
         h_in_d = 24
     };
-
-    time /= us_in_ms;
-    return fmt::format("{:0>2}:{:0>2}:{:0>2}:{:0>3}",
-        time / ms_in_h % h_in_d,
-        time / ms_in_m % m_in_h,
-        time / ms_in_s % s_in_m,
-        time % ms_in_s);
+    const uint64_t us = time_us_64();
+    return fmt::format("{:0>2}:{:0>2}:{:0>2}:{:0>3}:{:0>3}",
+        us / us_in_h,
+        us / us_in_m % m_in_h,
+        us / us_in_s % s_in_m,
+        us / us_in_ms % ms_in_s,
+        us % us_in_ms);
 }
 
 void Logger::Task()
 {
-    Logger::Log("Initiated");
+    Log("Initiated");
     while (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
-        while (xQueueReceive(
-                   m_syslog_q,
-                   static_cast<void*>(&m_log),
-                   m_lost_logs > 0 ? 0 : portMAX_DELAY)
-            == pdTRUE) {
-            m_log->PrintAndDelete();
+        while (s_syslog->Receive(&m_log, s_lost_logs->Count() > 0 ? 0 : portMAX_DELAY)) {
+            PrintLogAndDeleteMsg(m_log);
         }
-        if (m_lost_logs > 0) {
-            Logger::Log("Warning: lost {} logs.", m_lost_logs);
-            xSemaphoreTake(m_mutex, portMAX_DELAY);
-            Logger::m_lost_logs = 0;
-            xSemaphoreGive(m_mutex);
+        if (s_lost_logs->Count() > 0) {
+            Log("Warning: lost {} logs.", s_lost_logs->Count());
+            s_lost_logs->Reset();
         }
     }
 }
 
+/// TODO: remove
 // With current setup, pico tends to panic at around log number #8000 with one stresser as it runs out of memory.
 void StressTask(void* params)
 {
