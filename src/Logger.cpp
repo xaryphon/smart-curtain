@@ -35,12 +35,12 @@ Logger::Logger(const Constructors& constructors)
     s_lost_logs = new RTOS::Counter(LOST_LOGS_MAX, 0, "LostLogs");
 }
 
-void Logger::LogMessage(const std::string& msg)
+void Logger::LogMessage(std::string&& msg)
 {
     auto log = LogContent {
         .datetime = s_rtc->GetDatetime(),
         .task_name = GetTaskName(),
-        .msg = new std::string(msg)
+        .msg = new std::string(std::move(msg))
     };
     if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
         LogToQueue(log);
