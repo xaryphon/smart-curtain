@@ -4,10 +4,10 @@
 
 class LED {
 public:
-    explicit LED(const uint& pin, const char* name);
-    bool Put(const bool& state);
-    bool Set(const uint16_t& new_level);
-    bool Adjust(const int& increment);
+    explicit LED(uint pin, const char* name);
+    bool Put(bool state);
+    bool Set(uint16_t new_level);
+    bool Adjust(int increment);
 
     bool Toggle() { return Put(!m_on); }
     [[nodiscard]] bool State() const { return m_on; }

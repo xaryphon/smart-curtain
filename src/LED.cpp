@@ -2,7 +2,7 @@
 
 #include <hardware/pwm.h>
 
-LED::LED(const uint& pin, const char* name)
+LED::LED(const uint pin, const char* name)
     : m_pin(pin)
     , m_slice(pwm_gpio_to_slice_num(pin))
     , m_channel(pwm_gpio_to_channel(pin))
@@ -20,13 +20,13 @@ LED::LED(const uint& pin, const char* name)
     pwm_set_enabled(pwm_gpio_to_slice_num(m_pin), true);
 }
 
-bool LED::Put(const bool& state)
+bool LED::Put(const bool state)
 {
     m_on = state;
     return Set(m_level);
 }
 
-bool LED::Set(const uint16_t& new_level)
+bool LED::Set(const uint16_t new_level)
 {
     if (new_level > WRAP) {
         return false;
@@ -36,7 +36,7 @@ bool LED::Set(const uint16_t& new_level)
     return true;
 }
 
-bool LED::Adjust(const int& increment)
+bool LED::Adjust(const int increment)
 {
     const int new_level = m_level + increment;
     if (new_level < 0 || WRAP < new_level) {
