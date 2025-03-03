@@ -1,12 +1,18 @@
+#include <functional>
+
 #include <FreeRTOS.h>
+#include <pico/cyw43_arch.h>
 #include <pico/stdlib.h>
 #include <task.h>
 
 #include "AmbientLightSensor.hpp"
+#include "HttpServer.hpp"
 #include "I2C.hpp"
 #include "Logger.hpp"
 #include "Motor.hpp"
 #include "Primitive.hpp"
+#include "SPI.hpp"
+#include "W5500LWIP.hpp"
 #include "config.h"
 
 extern "C" {
@@ -14,6 +20,23 @@ uint32_t read_runtime_ctr(void)
 {
     return timer_hw->timerawl;
 }
+}
+
+static void late_main(std::function<void()>&& callback)
+{
+    auto* ptr = new std::function<void()>(std::move(callback));
+    xTaskCreate([](void* param) {
+        Logger::Log("Start of late main");
+        auto* ptr = static_cast<std::function<void()>*>(param);
+        (*ptr)();
+        delete ptr;
+        Logger::Log("End of late main");
+        vTaskDelete(nullptr);
+        for (;;) {
+            vTaskDelay(portMAX_DELAY);
+        }
+    },
+        "late_main", 1024, static_cast<void*>(ptr), tskIDLE_PRIORITY + 4, nullptr);
 }
 
 int main()
@@ -25,6 +48,7 @@ int main()
     /// Serial Interfaces
     const auto i2c_1 = std::make_unique<I2C>(I2C::SDA1::PIN_2, I2C::SCL1::PIN_3, BH1750::BAUDRATE_MAX);
     const auto i2c_0 = std::make_unique<I2C>(I2C::SDA0::PIN_4, I2C::SCL0::PIN_5, BH1750::BAUDRATE_MAX);
+    SPI* spi_1 = new SPI(SPI::RX1::PIN_12, SPI::TX1::PIN_15, SPI::SCK1::PIN_10, 10'000'000);
 
     /// Semaphores
     auto* control_auto = new RTOS::Semaphore { "ControlAuto" };
@@ -62,6 +86,15 @@ int main()
         .v_command = motor_command,
         .s_control_auto = control_auto,
         .v_belt_position = belt_position,
+    });
+
+    late_main([spi_1]() {
+        if (cyw43_arch_init() != 0) {
+            Logger::Log("cyw43_arch_init() failed");
+            return;
+        }
+        new W5500LWIP(spi_1, SPI::CS(9), W5500::INT(8), W5500::RST(7));
+        (new HttpServer(8080))->Listen();
     });
 
     Logger::Log("Semaphores: {}", RTOS::Implementation::Primitive::GetSemaphoreCount());
