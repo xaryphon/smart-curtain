@@ -52,6 +52,7 @@ int main()
 
     /// Semaphores
     auto* control_auto = new RTOS::Semaphore { "ControlAuto" };
+    auto* http_notify = new RTOS::Semaphore { "HttpNotify" };
 
     /// Variables
     auto* latest_measurement_als1 = new RTOS::Variable<LuxMeasurement> { "ALS-1-LatestMeasurement" };
@@ -75,7 +76,7 @@ int main()
         .v_motor_command = motor_command,
         .s_control_auto = control_auto,
     });
-    new Motor({
+    auto* motor = new Motor({
         .name = "Motor",
 
         .step = Motor::PinStep { 16 },
@@ -87,14 +88,24 @@ int main()
         .s_control_auto = control_auto,
         .v_belt_position = belt_position,
     });
+    auto* http = new HttpServer({
+        .port = 80,
+        .motor = motor,
+        .als1 = latest_measurement_als1,
+        .als2 = latest_measurement_als2,
+        .notify = http_notify,
+        .motor_command = motor_command,
+        .lux_target = lux_target,
+        .control_auto = control_auto,
+    });
 
-    late_main([spi_1]() {
+    late_main([spi_1, http]() {
         if (cyw43_arch_init() != 0) {
             Logger::Log("cyw43_arch_init() failed");
             return;
         }
         new W5500LWIP(spi_1, SPI::CS(9), W5500::INT(8), W5500::RST(7));
-        (new HttpServer(8080))->Listen();
+        http->Listen();
     });
 
     Logger::Log("Semaphores: {}", RTOS::Implementation::Primitive::GetSemaphoreCount());

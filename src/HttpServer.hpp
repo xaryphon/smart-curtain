@@ -3,9 +3,23 @@
 #include <lwip/tcp.h>
 #include <picohttpparser.h>
 
+#include "AmbientLightSensor.hpp"
+#include "Motor.hpp"
+
 class HttpServer {
 public:
-    explicit HttpServer(uint16_t port);
+    struct ConstructionParameters {
+        uint16_t port;
+        const Motor* motor;
+        RTOS::Variable<LuxMeasurement>* als1;
+        RTOS::Variable<LuxMeasurement>* als2;
+        RTOS::Semaphore* notify;
+        RTOS::Variable<Motor::Command>* motor_command;
+        RTOS::Variable<float>* lux_target;
+        RTOS::Semaphore* control_auto;
+    };
+
+    explicit HttpServer(const ConstructionParameters&);
     ~HttpServer();
 
     HttpServer(const HttpServer&) = delete;
@@ -15,12 +29,13 @@ public:
     HttpServer& operator=(HttpServer&&) = delete;
 
     bool Listen();
+    std::string BuildBody(bool include_status, bool include_settings);
 
 private:
     err_t AcceptCallback(struct tcp_pcb* newpcb, err_t err);
 
-    uint16_t m_port;
     struct tcp_pcb* m_pcb;
+    const ConstructionParameters m_params;
 };
 
 void test_http_server();

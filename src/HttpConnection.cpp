@@ -5,15 +5,17 @@
 
 #include <ArduinoJson.hpp>
 
+#include "HttpServer.hpp"
 #include "Logger.hpp"
 
 #define HTTP_ENABLE_DEBUG 0
 
-HttpConnection::HttpConnection(struct tcp_pcb* pcb)
-    : m_pcb(pcb)
+HttpConnection::HttpConnection(const ConstructionParameters& params)
+    : m_server(params.server)
+    , m_pcb(params.pcb)
 {
-    tcp_arg(pcb, this);
-    tcp_recv(pcb, [](void* arg, tcp_pcb* pcb, pbuf* p, err_t err) -> err_t {
+    tcp_arg(m_pcb, this);
+    tcp_recv(m_pcb, [](void* arg, tcp_pcb* pcb, pbuf* p, err_t err) -> err_t {
         (void)pcb;
         auto* conn = static_cast<HttpConnection*>(arg);
         auto ret = conn->RecvCallback(p, err);
@@ -25,7 +27,7 @@ HttpConnection::HttpConnection(struct tcp_pcb* pcb)
         }
         return ret;
     });
-    tcp_sent(pcb, [](void* arg, tcp_pcb* pcb, u16_t len) -> err_t {
+    tcp_sent(m_pcb, [](void* arg, tcp_pcb* pcb, u16_t len) -> err_t {
         (void)pcb;
         auto* conn = static_cast<HttpConnection*>(arg);
         auto ret = conn->SentCallback(len);
@@ -34,7 +36,7 @@ HttpConnection::HttpConnection(struct tcp_pcb* pcb)
         }
         return ret;
     });
-    tcp_err(pcb, [](void* arg, err_t err) -> void {
+    tcp_err(m_pcb, [](void* arg, err_t err) -> void {
         auto* conn = static_cast<HttpConnection*>(arg);
         conn->m_pcb = nullptr;
         conn->ErrorCallback(err);
@@ -359,61 +361,16 @@ bool HttpConnection::HandleRequest()
     return true;
 }
 
-std::string HttpConnection::BuildBody(bool include_status, bool include_settings)
-{
-    std::string body = "{";
-    auto ins = std::back_inserter(body);
-    if (include_status) {
-        if (body.size() != 1) {
-            body += ',';
-        }
-        fmt::format_to(ins, R"("mode":"{}",)", "manual");
-        fmt::format_to(ins, R"("motor":{{)");
-        fmt::format_to(ins, R"("target":{},)", 1.0f);
-        fmt::format_to(ins, R"("current":{},)", 0.5f);
-        fmt::format_to(ins, R"("target_raw":{},)", 8000);
-        fmt::format_to(ins, R"("current_raw":{},)", 4000);
-        fmt::format_to(ins, R"("length_raw":{})", 8000);
-        fmt::format_to(ins, "}},");
-        fmt::format_to(ins, R"("lux":{{)");
-        fmt::format_to(ins, R"("target":{},)", 100000.0f);
-        fmt::format_to(ins, R"("current":{},)", 1000.0f);
-        fmt::format_to(ins, R"("current_raw":[{},{}])", 900.0f, 1100.0f);
-        fmt::format_to(ins, "}}");
-    }
-    if (include_settings) {
-        if (body.size() != 1) {
-            body += ',';
-        }
-        fmt::format_to(ins, R"("wanted_mode":"{}",)", "manual");
-        fmt::format_to(ins, R"("manual":{{)");
-        fmt::format_to(ins, R"("target":{},)", 0.0f);
-        fmt::format_to(ins, R"("target_raw":{})", 0);
-        fmt::format_to(ins, "}},");
-        fmt::format_to(ins, R"("auto_static":{{"target":{}}},)", 0.0f);
-        fmt::format_to(ins, R"("auto_hourly":{{"targets":[)");
-        for (int i = 0; i < 24; i++) {
-            if (i != 0) {
-                body += ',';
-            }
-            fmt::format_to(ins, R"({})", static_cast<float>(1 << i) / 10.0f);
-        }
-        fmt::format_to(ins, "]}}");
-    }
-    body.append("}\n");
-    return body;
-}
-
 void HttpConnection::HandleGET(std::string_view path)
 {
     if (path == "/status") {
-        std::string body = BuildBody(true, false);
+        std::string body = m_server->BuildBody(true, false);
         RespondWith("200 OK", body.c_str());
     } else if (path == "/settings") {
-        std::string body = BuildBody(false, true);
+        std::string body = m_server->BuildBody(false, true);
         RespondWith("200 OK", body.c_str());
     } else if (path == "/status/full") {
-        std::string body = BuildBody(true, true);
+        std::string body = m_server->BuildBody(true, true);
         RespondWith("200 OK", body.c_str());
     } else {
         RespondWith("404 Not Found", R"({"message":"Page not found"})");
@@ -523,7 +480,7 @@ void HttpConnection::HandlePOST(std::string_view path, std::string_view body)
             Logger::Log("Setting hourly_targets something");
         }
 
-        std::string res_body = BuildBody(false, true);
+        std::string res_body = m_server->BuildBody(false, true);
         RespondWith("200 OK", res_body.c_str());
     } else if (path == "/calibrate") {
         Logger::Log("Start calibration");

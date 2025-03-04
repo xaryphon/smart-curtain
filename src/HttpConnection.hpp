@@ -6,9 +6,15 @@
 #include <lwip/tcp.h>
 #include <picohttpparser.h>
 
+class HttpServer;
 class HttpConnection {
 public:
-    explicit HttpConnection(struct tcp_pcb* pcb);
+    struct ConstructionParameters {
+        tcp_pcb* pcb;
+        HttpServer* server;
+    };
+
+    explicit HttpConnection(const ConstructionParameters&);
     ~HttpConnection();
 
     HttpConnection(const HttpConnection&) = delete;
@@ -33,10 +39,10 @@ private:
 
     [[nodiscard]] bool HandleRequest();
 
-    std::string BuildBody(bool include_status, bool include_settings);
     void HandleGET(std::string_view path);
     void HandlePOST(std::string_view path, std::string_view body);
 
+    HttpServer* m_server;
     tcp_pcb* m_pcb;
     bool m_tx_closed = false;
     bool m_rx_closed = false;
