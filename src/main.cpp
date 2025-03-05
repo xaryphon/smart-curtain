@@ -90,10 +90,10 @@ int main()
     auto* motor = new Motor({
         .name = "Motor",
 
-        .step = Motor::PinStep { 16 },
-        .direction = Motor::PinDirection { 17 },
-        .limit_cw = Motor::PinLimitCW { 18 },
-        .limit_ccw = Motor::PinLimitCCW { 19 },
+        .step = Motor::PinStep { 21 },
+        .direction = Motor::PinDirection { 20 },
+        .limit_cw = Motor::PinLimitCW { 19 },
+        .limit_ccw = Motor::PinLimitCCW { 18 },
 
         .v_command = motor_command,
         .s_control_auto = control_auto,
