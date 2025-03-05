@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 
@@ -69,6 +70,7 @@ protected:
             bool a;
             bool b;
         } ok;
+        std::array<uint8_t, SETTINGS_MEMORY_SIZE>* buffer;
     };
 
     void Program() const;
@@ -88,4 +90,5 @@ private:
 
     mutable Settings m_settings;
     bool m_safe = true;
+    std::array<uint8_t, SETTINGS_MEMORY_SIZE>* m_buffer;
 };

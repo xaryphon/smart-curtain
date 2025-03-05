@@ -130,6 +130,7 @@ void Flash::Program() const
     ProgramParameters program_parameters {
         .settings = m_settings,
         .ok = { true, true },
+        .buffer = m_buffer,
     };
     flash_safe_execute(EraseAndProgram, &program_parameters, UINT32_MAX);
     if (!program_parameters.ok.a) {
@@ -142,7 +143,7 @@ void Flash::Program() const
 
 void Flash::Erase(void* params)
 {
-    (void) params;
+    (void)params;
     flash_range_erase(FLASH_SETTINGS_A, SETTINGS_MEMORY_SIZE);
     flash_range_erase(FLASH_SETTINGS_B, SETTINGS_MEMORY_SIZE);
 }
@@ -151,28 +152,28 @@ void Flash::EraseAndProgram(void* program_parameters)
 {
     const auto settings = static_cast<ProgramParameters*>(program_parameters)->settings;
     auto* ok = &static_cast<ProgramParameters*>(program_parameters)->ok;
+    auto* buffer = static_cast<ProgramParameters*>(program_parameters)->buffer;
 
-    std::array<uint8_t, SETTINGS_MEMORY_SIZE> buffer;
-    buffer.fill(BYTE_EMPTY);
+    buffer->fill(BYTE_EMPTY);
 
     ptrdiff_t index = 0;
-    std::memcpy(buffer.data() + index, settings.lux_targets, LUX_MAP_LEN);
+    std::memcpy(buffer->data() + index, settings.lux_targets, LUX_MAP_LEN);
     index += LUX_MAP_LEN;
-    std::memcpy(buffer.data() + index, &settings.sys_mode, SYSTEM_MODE_LEN);
+    std::memcpy(buffer->data() + index, &settings.sys_mode, SYSTEM_MODE_LEN);
     index += SYSTEM_MODE_LEN;
-    std::memcpy(buffer.data() + index, &settings.motor_target, MOTOR_TARGET_LEN);
+    std::memcpy(buffer->data() + index, &settings.motor_target, MOTOR_TARGET_LEN);
     index += MOTOR_TARGET_LEN;
 
-    uint16_t crc = CRC16(buffer.data(), SETTINGS_LEN - CRC_LEN);
+    uint16_t crc = CRC16(buffer->data(), SETTINGS_LEN - CRC_LEN);
     crc = crc >> 8 | crc << 8;
-    std::memcpy(buffer.data() + index, &crc, CRC_LEN);
+    std::memcpy(buffer->data() + index, &crc, CRC_LEN);
 
     flash_range_erase(FLASH_SETTINGS_A, SETTINGS_MEMORY_SIZE);
-    flash_range_program(FLASH_SETTINGS_A, buffer.data(), SETTINGS_MEMORY_SIZE);
+    flash_range_program(FLASH_SETTINGS_A, buffer->data(), SETTINGS_MEMORY_SIZE);
     ok->a = CRC16(FlashPointer(FLASH_SETTINGS_A), SETTINGS_LEN) == 0;
 
     flash_range_erase(FLASH_SETTINGS_B, SETTINGS_MEMORY_SIZE);
-    flash_range_program(FLASH_SETTINGS_B, buffer.data(), SETTINGS_MEMORY_SIZE);
+    flash_range_program(FLASH_SETTINGS_B, buffer->data(), SETTINGS_MEMORY_SIZE);
     ok->b = CRC16(FlashPointer(FLASH_SETTINGS_B), SETTINGS_LEN) == 0;
 }
 
