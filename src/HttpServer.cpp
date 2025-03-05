@@ -65,7 +65,7 @@ std::string HttpServer::BuildBody(bool include_status, bool include_settings)
         }
         Motor::Command motor_command;
         if (!m_params.motor_command->Peek(&motor_command, pdMS_TO_TICKS(100))) {
-            motor_command = Motor::Command::CALIBRATE;
+            motor_command = Motor::Command::STOP;
         }
         const char* mode = nullptr;
         if (motor_command == Motor::Command::CALIBRATE) {
