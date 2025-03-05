@@ -41,45 +41,23 @@ void CLI::ProcessCommand()
     Logger::Log("[{}]", m_input.str());
     m_input >> cmd;
     if (cmd == "help") {
-        /// TODO command response formatting and grammar improvements
-        Logger::Log("Available commands:\n"
-                    "help - show this\n"
-                    "status - show system status\n"
-                    "target X - set target lux level\n"
-                    "motor X - \n"
-                    "wifi SSID PWD - set wifi credentials");
-    } else if (cmd == "status") {
-        /// TODO get status info from relevant task(s)
-        Logger::Log("status: ok\ntarget: 69");
-    } else if (cmd == "target") {
-        float target = 0;
-        if (m_input >> target) {
-            Logger::Log("Lux target set to {}", target);
-            m_v_lux_target->Overwrite(target);
-        } else {
-            Logger::Log("target: missing target value");
-        }
-    } else if (cmd == "motor") {
-        uint8_t motor_cmd = Motor::STOP;
-        if (m_input >> motor_cmd) {
-            Motor::Command current = Motor::STOP;
-            if (!m_v_motor_command->Peek(&current, 0) && current != Motor::CALIBRATE) {
-                m_s_control_auto->Take(0);
-                m_v_motor_command->Overwrite(static_cast<Motor::Command>(motor_cmd));
-                Logger::Log("[{}]", motor_cmd);
-            }
-            Logger::Log("[{}]", motor_cmd);
-        }
-    } else if (cmd == "wifi") {
-        std::string ssid;
-        std::string pwd;
-        if (m_input >> ssid && m_input >> pwd) {
-            Logger::Log("connecting to {}", ssid);
-            /// TODO send new credentials to relevant task(s)
-        } else {
-            Logger::Log("wifi: missing credentials");
-        }
-    } else if (!m_input.str().empty()) {
+        HelpCommand();
+    }
+    if (cmd == "target") {
+        TargetCommand();
+    }
+    if (cmd == "motor") {
+        MotorCommand();
+    }
+    if (cmd == "status") {
+        StatusCommand();
+    }
+    if (cmd == "rtc") {
+        RTCCommand();
+    }
+    if (cmd.empty()) {
+
+    } else {
         Logger::Log("Invalid command, use 'help' to see available commands");
     }
     m_input.clear(std::ios_base::goodbit);
@@ -95,4 +73,50 @@ void CLI::Task()
         }
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
+}
+
+void CLI::HelpCommand()
+{
+    /// TODO command response formatting and grammar improvements
+    Logger::Log("Available commands:\n"
+                "help - show this\n"
+                "status - show system status\n"
+                "target X - set target lux level\n"
+                "motor X - \n"
+                "wifi SSID PWD - set wifi credentials");
+}
+
+void CLI::StatusCommand()
+{
+    /// TODO get status info from relevant task(s)
+    Logger::Log("status: ok\ntarget: 69");
+}
+
+void CLI::TargetCommand()
+{
+    float target = 0;
+    if (m_input >> target) {
+        Logger::Log("Lux target set to {}", target);
+        m_v_lux_target->Overwrite(target);
+    } else {
+        Logger::Log("target: missing target value");
+    }
+}
+
+void CLI::MotorCommand()
+{
+    uint8_t motor_cmd = Motor::STOP;
+    if (m_input >> motor_cmd) {
+        Motor::Command current = Motor::STOP;
+        if (!m_v_motor_command->Peek(&current, 0) && current != Motor::CALIBRATE) {
+            m_s_control_auto->Take(0);
+            m_v_motor_command->Overwrite(static_cast<Motor::Command>(motor_cmd));
+            Logger::Log("[{}]", motor_cmd);
+        }
+        Logger::Log("[{}]", motor_cmd);
+    }
+}
+
+void CLI::RTCCommand()
+{
 }

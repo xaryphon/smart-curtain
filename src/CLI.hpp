@@ -32,6 +32,12 @@ public:
 private:
     TaskHandle_t m_task_handle = nullptr;
 
+    void HelpCommand();
+    void StatusCommand();
+    void TargetCommand();
+    void MotorCommand();
+    void RTCCommand();
+
     RTOS::Variable<float>* m_v_lux_target;
     RTOS::Variable<Motor::Command>* m_v_motor_command;
     RTOS::Semaphore* m_s_control_auto;
