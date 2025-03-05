@@ -130,7 +130,7 @@ void Flash::Program() const
     ProgramParameters program_parameters {
         .settings = m_settings,
         .ok = { true, true },
-        .buffer = m_buffer,
+        .buffer = &m_buffer,
     };
     flash_safe_execute(EraseAndProgram, &program_parameters, UINT32_MAX);
     if (!program_parameters.ok.a) {
