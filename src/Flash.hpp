@@ -90,5 +90,5 @@ private:
 
     mutable Settings m_settings;
     bool m_safe = true;
-    std::array<uint8_t, SETTINGS_MEMORY_SIZE>* m_buffer;
+    mutable std::array<uint8_t, SETTINGS_MEMORY_SIZE> m_buffer;
 };
