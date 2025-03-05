@@ -116,7 +116,7 @@ Flash::Settings Flash::FactorySettings()
             [H23] = 0,
             [LUX_STATIC] = 200,
         },
-        .sys_mode = bAUTO | bAUTO_HOURLY,
+        .sys_mode = bAUTO /* | bAUTO_HOURLY */,
         .motor_target = 0,
     };
 }
