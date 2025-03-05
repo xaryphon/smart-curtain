@@ -100,6 +100,7 @@ int main()
         .v_command = motor_command,
         .s_control_auto = control_auto,
         .v_belt_position = belt_position,
+        .s_http_notify = http_notify,
         .storage = storage,
     });
     auto* http = new HttpServer({

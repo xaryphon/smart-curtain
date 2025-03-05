@@ -45,6 +45,7 @@ public:
         RTOS::Variable<Command>* v_command;
         RTOS::Semaphore* s_control_auto;
         RTOS::Variable<uint8_t>* v_belt_position;
+        RTOS::Semaphore* s_http_notify;
 
         Storage* storage;
     };
@@ -96,6 +97,7 @@ private:
     RTOS::Variable<Command>* m_v_command;
     RTOS::Semaphore* m_s_control_auto;
     RTOS::Variable<uint8_t>* m_v_belt_position;
+    RTOS::Semaphore* m_s_notify;
 
     Command m_command = CALIBRATE;
     int m_belt_position = 0;
