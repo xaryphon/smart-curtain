@@ -9,6 +9,7 @@ namespace TaskPriority {
 using Type = BaseType_t;
 enum : Type {
     LOGGER = 1,
+    STORAGE = 2,
     ALS = 3,
     MOTOR = 3,
     W5500LWIP = 24,
@@ -19,6 +20,7 @@ namespace TaskStackSize {
 using Type = configSTACK_DEPTH_TYPE;
 enum : Type {
     LOGGER = 1024,
+    STORAGE = 1024,
     ALS = 1024,
     MOTOR = 512,
     W5500LWIP = 1024,

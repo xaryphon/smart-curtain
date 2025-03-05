@@ -35,12 +35,14 @@ target_link_libraries(${PROJECT_NAME}
     ArduinoJson
     fmt::fmt
     FreeRTOS-Kernel-Heap4
+    hardware_flash
     hardware_i2c
     hardware_pwm
     hardware_rtc
     hardware_spi
     pico_cyw43_arch_lwip_sys_freertos
     picohttpparser
+    pico_flash
     pico_lwip_mbedtls
     pico_mbedtls
     pico_stdlib
