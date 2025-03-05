@@ -40,16 +40,13 @@ class Flash {
     static const uint8_t* FlashPointer(const ptrdiff_t flash_address) { return reinterpret_cast<const uint8_t*>(XIP_BASE + flash_address); }
 
 public:
-    enum Setting : uint8_t {
+    enum Lux : uint8_t {
         // clang-format off
         H00, H01, H02, H03, H04, H05, H06, H07, H08, H09, H10, H11,
         H12, H13, H14, H15, H16, H17, H18, H19, H20, H21, H22, H23,
         LUX_STATIC,
-        MODE,
-        STEP_TARGET,
         // clang-format on
     };
-
     enum SystemMode : uint8_t {
         bAUTO = 0b01,
         bAUTO_HOURLY = 0b10,
@@ -84,7 +81,7 @@ private:
     [[nodiscard]] static Settings FactorySettings();
     void WriteSettingsBlocking(const Settings& items);
 
-    static void Erase(void * settings_flash_address);
+    static void Erase(void* settings_flash_address);
     static void EraseAndProgram(void* program_parameters);
     bool UpdateFrom(ptrdiff_t settings_address);
     static uint16_t CRC16(const uint8_t* buf, size_t length);
