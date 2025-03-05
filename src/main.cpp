@@ -6,6 +6,7 @@
 #include <task.h>
 
 #include "AmbientLightSensor.hpp"
+#include "CLI.hpp"
 #include "HttpServer.hpp"
 #include "I2C.hpp"
 #include "Logger.hpp"
@@ -75,6 +76,12 @@ int main()
         .rtc = rtc,
     });
     new Logger({ .task_name = "Logger" });
+    new CLI({ .task_name = "CLI",
+
+        .v_lux_target = lux_target,
+        .v_motor_command = motor_command,
+        .s_control_auto = control_auto });
+
     new AmbientLightSensor({
         .task_name = "ALS",
 

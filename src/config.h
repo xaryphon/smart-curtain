@@ -13,6 +13,7 @@ enum : Type {
     STORAGE = 2,
     ALS = 3,
     MOTOR = 3,
+    CLI = 5,
     W5500LWIP = 24,
 };
 } // namespace TaskPriority
@@ -25,6 +26,7 @@ enum : Type {
     STORAGE = 1024,
     ALS = 1024,
     MOTOR = 512,
+    CLI = 512,
     W5500LWIP = 1024,
 };
 } // namespace TaskStackSize
