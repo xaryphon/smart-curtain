@@ -12,6 +12,7 @@ RTOS::Semaphore* Storage::s_lux_target_auto = nullptr;
 Storage::Storage(const Parameters& parameters)
     : m_write_access(RTOS::Mutex { "FlashWriteAccess" })
     , m_lux_target(parameters.lux_target)
+    , m_http_notify(parameters.http_notify)
     , m_rtc(parameters.rtc)
 
 {
@@ -78,6 +79,7 @@ void Storage::Task()
 
         m_lux_target->Overwrite(new_target);
         Logger::Log("Updated Lux target to {}", new_target);
+        m_http_notify->Give();
     }
 }
 

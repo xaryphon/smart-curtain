@@ -16,6 +16,7 @@ public:
         RTOS::Semaphore* update_lux_target;
         RTOS::Semaphore* lux_target_auto;
         RTOS::Variable<float>* lux_target;
+        RTOS::Semaphore* http_notify;
 
         RTC* rtc;
     };
@@ -42,6 +43,7 @@ public:
         }
         callback(AccessSettings());
         Program();
+        m_http_notify->Give();
         m_write_access.Give();
         return true;
     }
@@ -66,6 +68,7 @@ private:
     static RTOS::Semaphore* s_update_lux;
     static RTOS::Semaphore* s_lux_target_auto;
     RTOS::Variable<float>* m_lux_target;
+    RTOS::Semaphore* m_http_notify;
 
     RTC* m_rtc;
 
