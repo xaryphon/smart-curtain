@@ -14,7 +14,6 @@ Storage::Storage(const Parameters& parameters)
     , m_lux_target(parameters.lux_target)
     , m_http_notify(parameters.http_notify)
     , m_rtc(parameters.rtc)
-
 {
     if (xTaskCreate(
             TASK_KONDOM(Storage, Task),
@@ -96,8 +95,8 @@ void Storage::AlarmEvent()
 
 void test_storage_task(void* params)
 {
-    //auto* update_lux_target = static_cast<TestStorageParams*>(params)->update_lux_target;
-    //auto* lux_target_auto = static_cast<TestStorageParams*>(params)->lux_target_auto;
+    // auto* update_lux_target = static_cast<TestStorageParams*>(params)->update_lux_target;
+    // auto* lux_target_auto = static_cast<TestStorageParams*>(params)->lux_target_auto;
     auto* storage = static_cast<TestStorageParams*>(params)->storage;
 
     Flash::Settings new_settings {};

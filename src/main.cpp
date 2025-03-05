@@ -71,6 +71,7 @@ int main()
         .update_lux_target = update_hourly_lux_target,
         .lux_target_auto = auto_hourly,
         .lux_target = lux_target,
+        .http_notify = http_notify,
         .rtc = rtc,
     });
     new Logger({ .task_name = "Logger" });
