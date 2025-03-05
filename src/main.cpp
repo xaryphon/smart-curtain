@@ -12,6 +12,7 @@
 #include "Motor.hpp"
 #include "Primitive.hpp"
 #include "SPI.hpp"
+#include "Storage.hpp"
 #include "W5500LWIP.hpp"
 #include "config.h"
 
@@ -53,6 +54,8 @@ int main()
     /// Semaphores
     auto* control_auto = new RTOS::Semaphore { "ControlAuto" };
     auto* http_notify = new RTOS::Semaphore { "HttpNotify" };
+    auto* auto_hourly = new RTOS::Semaphore { "AutoHourly" };
+    auto* update_hourly_lux_target = new RTOS::Semaphore { "UpdateLux" };
 
     /// Variables
     auto* latest_measurement_als1 = new RTOS::Variable<LuxMeasurement> { "ALS-1-LatestMeasurement" };
@@ -62,6 +65,14 @@ int main()
     auto* motor_command = new RTOS::Variable<Motor::Command> { "MotorAction" };
 
     /// Tasks
+    auto* storage = new Storage({
+        .task_name = "Storage",
+
+        .update_lux_target = update_hourly_lux_target,
+        .lux_target_auto = auto_hourly,
+        .lux_target = lux_target,
+        .rtc = rtc,
+    });
     new Logger({ .task_name = "Logger" });
     new AmbientLightSensor({
         .task_name = "ALS",

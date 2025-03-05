@@ -1,6 +1,7 @@
 target_sources(${PROJECT_NAME} PRIVATE
     AmbientLightSensor.cpp
     BH1750.cpp
+    Flash.cpp
     HttpConnection.cpp
     HttpServer.cpp
     I2C.cpp
@@ -14,6 +15,7 @@ target_sources(${PROJECT_NAME} PRIVATE
     Semaphore.cpp
     SPI.cpp
     SPIDevice.cpp
+    Storage.cpp
     W5500.cpp
     W5500LWIP.cpp
 )
