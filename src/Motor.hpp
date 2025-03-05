@@ -49,6 +49,14 @@ public:
     explicit Motor(const Parameters& parameters);
     [[nodiscard]] static std::string CommandString(Motor::Command cmd);
 
+    [[nodiscard]] int GetBeltPosition() const {
+        return m_belt_position;
+    }
+
+    [[nodiscard]] int GetBeltMaximum() const {
+        return m_belt_max;
+    }
+
 private:
     [[nodiscard]] bool IsCWLimitSwitchPressed() const;
     [[nodiscard]] bool IsCCWLimitSwitchPressed() const;

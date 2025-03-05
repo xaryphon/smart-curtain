@@ -1,16 +1,21 @@
 #include "HttpConnection.hpp"
 
+#include <cmath>
 #include <cstring>
 
+#include <ArduinoJson.hpp>
+
+#include "HttpServer.hpp"
 #include "Logger.hpp"
 
 #define HTTP_ENABLE_DEBUG 0
 
-HttpConnection::HttpConnection(struct tcp_pcb* pcb)
-    : m_pcb(pcb)
+HttpConnection::HttpConnection(const ConstructionParameters& params)
+    : m_server(params.server)
+    , m_pcb(params.pcb)
 {
-    tcp_arg(pcb, this);
-    tcp_recv(pcb, [](void* arg, tcp_pcb* pcb, pbuf* p, err_t err) -> err_t {
+    tcp_arg(m_pcb, this);
+    tcp_recv(m_pcb, [](void* arg, tcp_pcb* pcb, pbuf* p, err_t err) -> err_t {
         (void)pcb;
         auto* conn = static_cast<HttpConnection*>(arg);
         auto ret = conn->RecvCallback(p, err);
@@ -22,7 +27,7 @@ HttpConnection::HttpConnection(struct tcp_pcb* pcb)
         }
         return ret;
     });
-    tcp_sent(pcb, [](void* arg, tcp_pcb* pcb, u16_t len) -> err_t {
+    tcp_sent(m_pcb, [](void* arg, tcp_pcb* pcb, u16_t len) -> err_t {
         (void)pcb;
         auto* conn = static_cast<HttpConnection*>(arg);
         auto ret = conn->SentCallback(len);
@@ -31,7 +36,7 @@ HttpConnection::HttpConnection(struct tcp_pcb* pcb)
         }
         return ret;
     });
-    tcp_err(pcb, [](void* arg, err_t err) -> void {
+    tcp_err(m_pcb, [](void* arg, err_t err) -> void {
         auto* conn = static_cast<HttpConnection*>(arg);
         conn->m_pcb = nullptr;
         conn->ErrorCallback(err);
@@ -225,7 +230,7 @@ void HttpConnection::RespondWith(const char* status, const char* body)
         std::string head = fmt::format(
             "HTTP/1.1 {}\r\n"
             "Connection: close\r\n"
-            "Content-Type: text/plain\r\n"
+            "Content-Type: application/json\r\n"
             "Content-Length: {}\r\n"
             "\r\n",
             status, body_len);
@@ -356,30 +361,131 @@ bool HttpConnection::HandleRequest()
     return true;
 }
 
-size_t HttpConnection::s_target_lux = 0;
-
 void HttpConnection::HandleGET(std::string_view path)
 {
-    if (path == "/target") {
-        std::string body = fmt::format("{}", s_target_lux);
+    if (path == "/status") {
+        std::string body = m_server->BuildBody(true, false);
+        RespondWith("200 OK", body.c_str());
+    } else if (path == "/settings") {
+        std::string body = m_server->BuildBody(false, true);
+        RespondWith("200 OK", body.c_str());
+    } else if (path == "/status/full") {
+        std::string body = m_server->BuildBody(true, true);
         RespondWith("200 OK", body.c_str());
     } else {
-        RespondWith("404 Not Found", "Not Found");
+        RespondWith("404 Not Found", R"({"message":"Page not found"})");
     }
 }
 
 void HttpConnection::HandlePOST(std::string_view path, std::string_view body)
 {
-    if (path == "/target") {
-        size_t old = s_target_lux;
-        if (!ParseSizeTFromStringView(body, &s_target_lux)) {
-            RespondWith("400 Bad Request", "Body invalid");
+    if (path == "/settings") {
+        ArduinoJson::JsonDocument doc;
+        ArduinoJson::deserializeJson(doc, body);
+
+        uint8_t next_mode = 0;
+        float manual_target = NAN;
+        int manual_target_raw = -1;
+        float static_target = NAN;
+        std::array<float, 24> hourly_targets = { NAN };
+
+        if (std::string_view wanted_mode = doc["wanted_mode"]; !wanted_mode.empty()) {
+            if (wanted_mode == "manual") {
+                next_mode = 1;
+            } else if (wanted_mode == "auto_static") {
+                next_mode = 2;
+            } else if (wanted_mode == "auto_hourly") {
+                next_mode = 3;
+            } else {
+                RespondWith("400 Bad Request", R"({"message": "Invalid wanted_mode"})");
+                return;
+            }
+        }
+        if (ArduinoJson::JsonVariantConst manual = doc["manual"]) {
+            if (!manual.is<ArduinoJson::JsonObjectConst>()) {
+                RespondWith("400 Bad Request", R"({"message": "Invalid manual"})");
+                return;
+            }
+            if (ArduinoJson::JsonVariantConst target_ = manual["target"]) {
+                if (!target_.is<float>()) {
+                    RespondWith("400 Bad Request", R"({"message": "Invalid manual.target"})");
+                    return;
+                }
+                manual_target = target_;
+            }
+            if (ArduinoJson::JsonVariantConst target_ = manual["target_raw"]) {
+                if (!target_.is<int>()) {
+                    RespondWith("400 Bad Request", R"({"message": "Invalid manual.target_raw"})");
+                    return;
+                }
+                manual_target_raw = target_;
+            }
+        }
+        if (ArduinoJson::JsonVariantConst auto_static = doc["auto_static"]) {
+            if (!auto_static.is<ArduinoJson::JsonObjectConst>()) {
+                RespondWith("400 Bad Request", R"({"message": "Invalid auto_static"})");
+                return;
+            }
+            if (ArduinoJson::JsonVariantConst target_ = auto_static["target"]) {
+                if (!target_.is<float>()) {
+                    RespondWith("400 Bad Request", R"({"message": "Invalid auto_static"})");
+                    return;
+                }
+                static_target = target_;
+            }
+        }
+        if (ArduinoJson::JsonVariantConst auto_hourly = doc["auto_hourly"]) {
+            if (!auto_hourly.is<ArduinoJson::JsonObjectConst>()) {
+                RespondWith("400 Bad Request", R"({"message": "Invalid auto_hourly"})");
+                return;
+            }
+            if (ArduinoJson::JsonVariantConst targets_ = auto_hourly["targets"]) {
+                if (ArduinoJson::JsonArrayConst targets = targets_) {
+                    if (targets.size() != 24) {
+                        RespondWith("400 Bad Request", R"({"message": "Invalid auto_hourly.targets"})");
+                        return;
+                    }
+                    for (size_t i = 0; i < 24; i++) {
+                        float target = targets[i] | NAN;
+                        if (std::isnan(target)) {
+                            RespondWith("400 Bad Request", R"({"message": "Invalid auto_hourly.targets"})");
+                            return;
+                        }
+                        hourly_targets[i] = target;
+                    }
+                } else {
+                    RespondWith("400 Bad Request", R"({"message": "Invalid auto_hourly.targets"})");
+                    return;
+                }
+            }
+        }
+        if (!std::isnan(manual_target) && manual_target_raw >= 0) {
+            RespondWith("400 Bad Request", R"({"message": "manual.target and manual.target_raw are mutually exclusive"})");
             return;
         }
-        Logger::Log("HTTP: Set target lux to {}", s_target_lux);
-        std::string res_body = fmt::format("{} -> {}", old, s_target_lux);
+
+        if (next_mode != 0) {
+            Logger::Log("Setting mode to {}", next_mode);
+        }
+        if (!std::isnan(manual_target)) {
+            Logger::Log("Setting manual_target to {}%", manual_target * 100.0f);
+        }
+        if (manual_target_raw >= 0) {
+            Logger::Log("Setting manual_target to {}", manual_target_raw);
+        }
+        if (!std::isnan(static_target)) {
+            Logger::Log("Setting static_target to {}", static_target);
+        }
+        if (!std::isnan(hourly_targets[0])) {
+            Logger::Log("Setting hourly_targets something");
+        }
+
+        std::string res_body = m_server->BuildBody(false, true);
         RespondWith("200 OK", res_body.c_str());
+    } else if (path == "/calibrate") {
+        Logger::Log("Start calibration");
+        RespondWith("202 Accepted", R"({})");
     } else {
-        RespondWith("404 Not Found", "Not Found");
+        RespondWith("404 Not Found", R"({"message":"Page not found"})");
     }
 }

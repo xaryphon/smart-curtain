@@ -1,10 +1,13 @@
 #include "W5500LWIP.hpp"
 
+#include <array>
 #include <cstring>
 
+#include <lwip/autoip.h>
 #include <lwip/tcpip.h>
 #include <netif/etharp.h>
 
+#include "Logger.hpp"
 #include "config.h"
 
 static SemaphoreHandle_t g_W5500_Semaphore;
@@ -35,6 +38,15 @@ W5500LWIP::W5500LWIP(SPI* spi, SPI::CS pin_cs, W5500::INT pin_int, W5500::RST pi
     };
     netif_add_noaddr(&m_netif, this, init, tcpip_input);
     netif_set_up(&m_netif);
+
+    netif_set_status_callback(&m_netif, [](struct netif* netif) -> void {
+        uint32_t ip_ = netif->ip_addr.addr;
+        std::array<uint8_t, 4> ip = {};
+        static_assert(sizeof(uint32_t) == ip.size());
+        memcpy(ip.data(), &ip_, sizeof(uint32_t));
+        Logger::Log("W5500 {} {}.{}.{}.{}", netif_is_link_up(netif) ? "UP" : "DOWN", ip[0], ip[1], ip[2], ip[3]);
+    });
+    autoip_start(&m_netif);
 }
 
 bool W5500LWIP::IsLinkUp()
@@ -304,7 +316,7 @@ void w5500_lwip_test_task(void* param)
     SPI* spi = new SPI(SPI::RX0::PIN_16, SPI::TX0::PIN_19, SPI::SCK0::PIN_18, 10'000'000);
     W5500LWIP* w5500 = new W5500LWIP(spi, SPI::CS(17), W5500::INT(15), W5500::RST(20));
 
-    //dhcp_start(w5500->GetNetif());
+    // dhcp_start(w5500->GetNetif());
     autoip_start(w5500->GetNetif());
 
     bool was_up = false;

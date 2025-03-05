@@ -6,23 +6,23 @@
 #define EXAMPLE_TASK_PRIORITY 1
 
 namespace TaskPriority {
-    using Type = BaseType_t;
-    enum : Type {
-        LOGGER = 1,
-        ALS = 3,
-        MOTOR = 3,
-        W5500LWIP = 24,
-    };
+using Type = BaseType_t;
+enum : Type {
+    LOGGER = 1,
+    ALS = 3,
+    MOTOR = 3,
+    W5500LWIP = 24,
+};
 } // namespace TaskPriority
 
 namespace TaskStackSize {
-    using Type = configSTACK_DEPTH_TYPE;
-    enum : Type {
-        LOGGER = 1024,
-        ALS = 1024,
-        MOTOR = 512,
-        W5500LWIP = 512,
-    };
+using Type = configSTACK_DEPTH_TYPE;
+enum : Type {
+    LOGGER = 1024,
+    ALS = 1024,
+    MOTOR = 512,
+    W5500LWIP = 1024,
+};
 } // namespace TaskStackSize
 
 #define TASK_KONDOM(klass, func) [](void* param) -> void { static_cast<klass*>(param)->func(); }
