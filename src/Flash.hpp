@@ -9,8 +9,8 @@
 
 class Flash {
     static constexpr uint8_t BYTE_EMPTY = 0xFF;
-    static constexpr ptrdiff_t BOTTOM = XIP_BASE;
-    static constexpr ptrdiff_t TOP = BOTTOM + PICO_FLASH_SIZE_BYTES;
+    static constexpr ptrdiff_t FLASH_BOTTOM = 0;
+    static constexpr ptrdiff_t FLASH_TOP = FLASH_BOTTOM + PICO_FLASH_SIZE_BYTES;
 
     using LuxType = float;
     using ModeType = int8_t;
@@ -27,17 +27,17 @@ class Flash {
     static constexpr size_t SETTINGS_LEN = CRC_LEN + LUX_MAP_LEN + SYSTEM_MODE_LEN + MOTOR_TARGET_LEN;
 
     static constexpr ptrdiff_t SETTINGS_CAPACITY = PICO_FLASH_SIZE_BYTES / 4;
-    static constexpr ptrdiff_t SETTINGS_BOTTOM = BOTTOM + PICO_FLASH_SIZE_BYTES - SETTINGS_CAPACITY;
-    static constexpr ptrdiff_t SETTINGS_TOP = SETTINGS_BOTTOM + SETTINGS_CAPACITY;
+    static constexpr ptrdiff_t FLASH_SETTINGS_BOTTOM = FLASH_BOTTOM + PICO_FLASH_SIZE_BYTES - SETTINGS_CAPACITY;
+    static constexpr ptrdiff_t FLASH_SETTINGS_TOP = FLASH_SETTINGS_BOTTOM + SETTINGS_CAPACITY;
 
     static_assert(SETTINGS_LEN * 2 < SETTINGS_CAPACITY);
 
     static constexpr size_t SETTINGS_MEMORY_SIZE = (SETTINGS_LEN + FLASH_PAGE_SIZE - 1) / FLASH_PAGE_SIZE * FLASH_PAGE_SIZE;
 
     static constexpr ptrdiff_t FLASH_SETTINGS_A = SETTINGS_CAPACITY * 3;
-    static constexpr ptrdiff_t FLASH_SETTINGS_B = SETTINGS_CAPACITY * 3 + SETTINGS_CAPACITY / 2;
+    static constexpr ptrdiff_t FLASH_SETTINGS_B = FLASH_SETTINGS_A + SETTINGS_CAPACITY / 2;
 
-    static const uint8_t* FlashPointer(const ptrdiff_t flash_address) { return reinterpret_cast<const uint8_t*>(BOTTOM + flash_address); }
+    static const uint8_t* FlashPointer(const ptrdiff_t flash_address) { return reinterpret_cast<const uint8_t*>(XIP_BASE + flash_address); }
 
 public:
     enum Setting : uint8_t {

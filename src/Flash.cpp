@@ -48,23 +48,24 @@ void Flash::EraseSettings()
 
 bool Flash::SettingsMemoryIsSafe()
 {
-    static constexpr ptrdiff_t FLASH_MIDDLE = BOTTOM + PICO_FLASH_SIZE_BYTES / 2;
+    static constexpr ptrdiff_t FLASH_MIDDLE = FLASH_BOTTOM + PICO_FLASH_SIZE_BYTES / 2;
 
     uint8_t byte = 0;
     int program_percentage = 0;
 
-    static constexpr ptrdiff_t start = SETTINGS_BOTTOM - 1;
-    for (ptrdiff_t flash_address = start; flash_address > BOTTOM; --flash_address) {
+    static constexpr ptrdiff_t start = FLASH_SETTINGS_BOTTOM - 1;
+    for (ptrdiff_t flash_address = start; flash_address > FLASH_BOTTOM; --flash_address) {
         byte = *FlashPointer(flash_address);
         if (byte != BYTE_EMPTY) {
-            program_percentage = (flash_address - BOTTOM) * 100 / PICO_FLASH_SIZE_BYTES;
+            program_percentage = flash_address * 100 / PICO_FLASH_SIZE_BYTES;
             if (flash_address == start) {
-                Logger::Log("[Flash] Error: Settings compromised; program memory reaches to ~{} % ; address [0x{:X}]", program_percentage, flash_address);
+                Logger::Log("[Flash] Error: Settings compromised; program memory reaches to ~{} % ; address [0x{:X}]",
+                    program_percentage, flash_address);
                 return false;
             }
             if (flash_address > FLASH_MIDDLE) {
                 Logger::Log("[Flash] Warning: Settings safety range breached [0x{:X} - 0x{:X}]. Program memory reaches to ~{} %",
-                    FLASH_MIDDLE, SETTINGS_BOTTOM, program_percentage);
+                    FLASH_MIDDLE, FLASH_SETTINGS_BOTTOM, program_percentage);
                 return true;
             }
             break;
