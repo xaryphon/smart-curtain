@@ -50,6 +50,7 @@ Motor::Motor(const Parameters& parameters)
         Logger::Log("Error: Failed to created task [{}]", parameters.name);
     }
     m_s_control_auto->Take(0);
+    m_v_command->Overwrite(CALIBRATE);
 }
 
 std::string Motor::CommandString(const Motor::Command cmd)
@@ -126,11 +127,6 @@ bool Motor::StepCCW() // NOLINT(readability-make-member-function-const)
 void Motor::Task()
 {
     Logger::Log("Initiated");
-    if (Calibrate()) {
-        PermitAutomaticControl();
-    } else {
-        m_s_control_auto->Take(0);
-    }
     while (true) {
         m_v_command->Peek(&m_command, portMAX_DELAY);
         if (m_belt_max == 0 && m_command != CALIBRATE) {
