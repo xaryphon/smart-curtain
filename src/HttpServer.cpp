@@ -207,7 +207,7 @@ err_t HttpServer::AcceptCallback(struct tcp_pcb* newpcb, err_t err)
 void HttpServer::TaskEntry()
 {
     while (true) {
-        m_params.notify->Take(5000);
+        m_params.notify->Take(pdMS_TO_TICKS(5000));
         if (m_subscribed.empty()) {
             continue;
         }
