@@ -14,15 +14,8 @@ SemaphoreHandler::~SemaphoreHandler()
     }
 }
 
-// Move Constructor
-SemaphoreHandler::SemaphoreHandler(SemaphoreHandler&& semaphore_handler) noexcept
-    : m_handle(std::exchange(semaphore_handler.m_handle, nullptr))
-    , m_name(semaphore_handler.m_name)
-{
-}
-
 // Explicit Derivation Constructor
-SemaphoreHandler::SemaphoreHandler(SemaphoreHandle_t handle, const char* type, const char* name)
+SemaphoreHandler::SemaphoreHandler(const SemaphoreHandle_t handle, const char* name)
     : m_handle(handle)
     , m_name(name)
 {
@@ -31,24 +24,6 @@ SemaphoreHandler::SemaphoreHandler(SemaphoreHandle_t handle, const char* type, c
 }
 } // namespace RTOS::Implementation
 
-bool RTOS::Semaphore::Give()
-{
-    if (xSemaphoreGive(Handle()) == pdFALSE) {
-        Logger::Log("Error: {}.Give failed", Name());
-        return false;
-    }
-    return true;
-}
-
-bool RTOS::RecursiveMutex::Give()
-{
-    if (xSemaphoreGiveRecursive(Handle()) != pdTRUE) {
-        Logger::Log("Error: {}.Give failed", Name());
-        return false;
-    }
-    return true;
-}
-
 /// TODO: remove
 #include <mutex>
 
@@ -56,12 +31,12 @@ void example_semaphores()
 {
     /// Allowed:
     RTOS::Semaphore semaphore1 { "asd" };
-    auto semaphore2 = std::move(semaphore1);
 
     /// Disallowed:
     // semaphore1 = semaphore2;
     // auto semaphore4 = semaphore1;
     // semaphore2 = std::move(semaphore1);
+    // auto semaphore2 = std::move(semaphore1);
 }
 
 void test_semaphore()
@@ -78,18 +53,6 @@ void test_semaphore()
     }
     if (semaphore_1.Count() != 0) {
         Logger::Log("semaphore.Take doesn't work");
-    }
-    auto semaphore_2 = std::move(semaphore_1);
-    // now semaphore_1 calls will fail
-    semaphore_2.Give();
-    {
-        std::lock_guard<RTOS::Semaphore> const exclusive(semaphore_2);
-        if (semaphore_2.Count() != 0) {
-            Logger::Log("semaphore_1 lock_guard take failed");
-        }
-    }
-    if (semaphore_2.Count() != 1) {
-        Logger::Log("semaphore_1 lock_guard didn't give back");
     }
     Logger::Log("Semaphores: {}",
         RTOS::Implementation::Primitive::GetSemaphoreCount());
@@ -117,7 +80,6 @@ void test_counter()
     while (counter.Count() < counter.MaxCount()) {
         counter.Give();
     }
-    auto transferred_counter = std::move(counter);
     Logger::Log("Counters: {}",
         RTOS::Implementation::Primitive::GetSemaphoreCount());
 }
@@ -136,7 +98,6 @@ void test_mutex()
     if (mutex.GetHolder() == nullptr) {
         Logger::Log("mutex has no holder even though taken");
     }
-    auto transferred_mutex = std::move(mutex);
     Logger::Log("Mutexes: {}",
         RTOS::Implementation::Primitive::GetSemaphoreCount());
 }
@@ -154,7 +115,6 @@ void test_recursive_mutex()
             Logger::Log("recursive_mutex.Take #{} failed", attempt + 1);
         }
     }
-    auto transferred_recursive_mutex = std::move(recursive_mutex);
     Logger::Log("Recursive mutexes: {}",
         RTOS::Implementation::Primitive::GetSemaphoreCount());
 }
@@ -175,11 +135,7 @@ void test_all_semaphore_types()
     RTOS::Semaphore sema7 { "asd" };
     RTOS::Semaphore sema8 { "asd" };
 
-    Logger::Log("Semaphores: {}",
-        RTOS::Implementation::Primitive::GetSemaphoreCount());
-    Logger::Log("Queues: {}",
-        RTOS::Implementation::Primitive::GetQueueCount());
-    Logger::Log("Total queues/semaphores registered: {} / {}",
-        RTOS::Implementation::Primitive::GetQueueCount() + RTOS::Implementation::Primitive::GetSemaphoreCount(),
-        configQUEUE_REGISTRY_SIZE);
+    Logger::Log("Semaphores: {}", RTOS::Implementation::Primitive::GetSemaphoreCount());
+    Logger::Log("Queues: {}", RTOS::Implementation::Primitive::GetQueueCount());
+    Logger::Log("Total queues/semaphores registered: {} / {}", RTOS::Implementation::Primitive::GetQueueCount() + RTOS::Implementation::Primitive::GetSemaphoreCount(), configQUEUE_REGISTRY_SIZE);
 }
