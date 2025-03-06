@@ -126,11 +126,10 @@ bool Motor::StepCCW() // NOLINT(readability-make-member-function-const)
 void Motor::Task()
 {
     Logger::Log("Initiated");
-    Calibrate();
-    if (m_belt_max == 0) {
-        m_s_control_auto->Take(0);
-    } else {
+    if (Calibrate()) {
         PermitAutomaticControl();
+    } else {
+        m_s_control_auto->Take(0);
     }
     while (true) {
         m_v_command->Peek(&m_command, portMAX_DELAY);
