@@ -5,22 +5,24 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.components.sensor import SensorEntity, SensorDeviceClass, SensorStateClass
 from homeassistant.const import CONF_URL
+from .device import DeviceMode
 
 _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
-    cover = SmartCurtainSensor(config_entry.data.get('name'), config_entry.data.get('url'))
-    async_add_entities([cover])
+    device = config_entry.runtime_data
+    lux = SmartCurtainSensor(config_entry.data.get('name'), device)
+    mode = SmartCurtainModeSensor(config_entry.data.get('name'), device)
+    async_add_entities([lux, mode])
 
 class SmartCurtainSensor(SensorEntity):
     _attr_device_class = SensorDeviceClass.ILLUMINANCE
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = "lx"
 
-    def __init__(self, name, url):
+    def __init__(self, name, device):
         self._name = name
-        self._url = url
-        self._value = 0
+        self._device = device
 
     @property
     def name(self):
@@ -28,14 +30,23 @@ class SmartCurtainSensor(SensorEntity):
 
     @property
     def native_value(self) -> float:
-        return self._value
+        return self._device.lux_current
 
     def update(self):
-        try:
-            response = requests.get(f"{self._url}/als")
-            if response.status_code == 200:
-                data = response.json()
-                self._value = float(data["value"])
-                _LOGGER.info(f"Updated state: {self._value}")
-        except requests.exceptions.RequestException as e:
-            _LOGGER.error(f"Error fetching sensor state: {e}")
+        pass
+
+class SmartCurtainModeSensor(SensorEntity):
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = [x.value for x in DeviceMode]
+
+    def __init__(self, name, device):
+        self._name = name
+        self._device = device
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def native_value(self) -> str:
+        return self._device.mode.value

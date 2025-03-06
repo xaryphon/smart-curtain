@@ -9,7 +9,10 @@ from homeassistant.const import CONF_URL
 _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
-    numbers = [SmartCurtainNumber(config_entry.data.get('name'), config_entry.data.get('url'), i) for i in range(24)]
+    name = config_entry.data.get('name')
+    device = config_entry.runtime_data
+    numbers = [SmartCurtainNumber(f"{name} {i:02}h", device, i) for i in range(24)]
+    numbers.append(SmartCurtainNumber(f"{name} static", device, None))
     async_add_entities(numbers)
 
 class SmartCurtainNumber(NumberEntity):
@@ -20,10 +23,9 @@ class SmartCurtainNumber(NumberEntity):
     _attr_native_max_value = 100000
     _attr_native_min_value = 0
 
-    def __init__(self, name, url, i):
-        self._name = f"{name} {i:02}h"
-        self._url = url
-        self._value = 0
+    def __init__(self, name, device, i):
+        self._name = name
+        self._device = device
         self._hour = i
 
     @property
@@ -32,24 +34,17 @@ class SmartCurtainNumber(NumberEntity):
 
     @property
     def native_value(self) -> float:
-        return self._value
+        if self._hour is None:
+            return self._device.auto_static_target
+        return self._device.auto_hourly_targets[self._hour]
 
     def set_native_value(self, value: float) -> None:
-        try:
-            response = requests.post(f"{self._url}/target/{value}")
-            if response.status_code == 200:
-                _LOGGER.info(f"Lux target changed to {value}.")
-            else:
-                _LOGGER.error(f"Failed to set lux target to {value}.")
-        except requests.exceptions.RequestException as e:
-            _LOGGER.error(f"Error setting lux target to {value}: {e}")
+        if self._hour is None:
+            self._device.send_settings({"auto_static": {"target": value}})
+        else:
+            new_targets = list(self._device.auto_hourly_targets)
+            new_targets[self._hour] = value
+            self._device.send_settings({"auto_hourly": {"targets": new_targets}})
 
     def update(self):
-        try:
-            response = requests.get(f"{self._url}/target")
-            if response.status_code == 200:
-                data = response.json()
-                self._value = float(data["value"])
-                _LOGGER.info(f"Updated state: {self._value}")
-        except requests.exceptions.RequestException as e:
-            _LOGGER.error(f"Error fetching target state: {e}")
+        pass
