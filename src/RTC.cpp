@@ -13,7 +13,6 @@ RTC::RTC()
 {
     assert(!s_initialized);
     rtc_init();
-    Set(Default());
     s_initialized = true;
 }
 
@@ -21,7 +20,12 @@ bool RTC::Set(const datetime_t& time)
 {
     std::lock_guard exclusive(m_access);
     datetime_t t = time;
-    return rtc_set_datetime(&t);
+    if (rtc_set_datetime(&t)) {
+        Logger::Log("[RTC] Error: Set failed.");
+        return false;
+    }
+    m_is_set = true;
+    return m_is_set;
 }
 
 void RTC::SetAlarm(const datetime_t& time, const rtc_callback_t& callback)
@@ -40,7 +44,7 @@ datetime_t RTC::GetDatetime()
 {
     std::lock_guard exclusive(m_access);
     datetime_t time;
-    if (s_initialized && rtc_get_datetime(&time)) {
+    if (s_initialized && m_is_set && rtc_get_datetime(&time)) {
         return time;
     }
     return Default();
@@ -130,14 +134,15 @@ void test_task(void* params)
     auto* rtc = static_cast<test_params*>(params)->rtc;
     sema = static_cast<test_params*>(params)->sema;
     rtc->SetAlarm({
-        .year = -1,
-        .month = -1,
-        .day = -1,
-        .dotw = -1,
-        .hour = -1,
-        .min = -1,
-        .sec = 00, // every minute
-    }, alarm);
+                      .year = -1,
+                      .month = -1,
+                      .day = -1,
+                      .dotw = -1,
+                      .hour = -1,
+                      .min = -1,
+                      .sec = 00, // every minute
+                  },
+        alarm);
     while (true) {
         sema->Take(portMAX_DELAY);
         datetime_t time = rtc->GetDatetime();

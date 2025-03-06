@@ -14,6 +14,7 @@ public:
     [[nodiscard]] datetime_t GetDatetime();
     [[nodiscard]] static const char* DayOfWeekString(const datetime_t& time);
     [[nodiscard]] static const char* MonthString(const datetime_t& time);
+    [[nodiscard]] bool IsSet() const { return m_is_set; }
 
 private:
     [[nodiscard]] static datetime_t Default();
@@ -21,6 +22,7 @@ private:
     static bool s_initialized;
     RTOS::Mutex m_access;
     bool m_alarmed = false;
+    bool m_is_set = false;
 };
 
 /// TODO: remove
