@@ -35,7 +35,8 @@ bool Flash::UpdateFrom(ptrdiff_t settings_address)
     settings_pointer += LUX_MAP_LEN;
     std::memcpy(&m_settings.sys_mode, settings_pointer, SYSTEM_MODE_LEN);
     settings_pointer += SYSTEM_MODE_LEN;
-    std::memcpy(&m_settings.sys_mode, settings_pointer, MOTOR_TARGET_LEN);
+    std::memcpy(&m_settings.motor_target, settings_pointer, MOTOR_TARGET_LEN);
+    settings_pointer += MOTOR_TARGET_LEN;
 
     Logger::Log("[Flash] Updated from flash {}", settings_address == FLASH_SETTINGS_A ? "A" : "B");
     return true;
