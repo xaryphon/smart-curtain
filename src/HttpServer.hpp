@@ -1,5 +1,7 @@
 #pragma once
 
+#include <forward_list>
+
 #include <lwip/tcp.h>
 #include <picohttpparser.h>
 
@@ -37,9 +39,11 @@ public:
 
 private:
     err_t AcceptCallback(struct tcp_pcb* newpcb, err_t err);
+    void TaskEntry();
 
     struct tcp_pcb* m_pcb;
     const ConstructionParameters m_params;
+    std::forward_list<HttpConnection*> m_subscribed;
     friend HttpConnection;
 };
 

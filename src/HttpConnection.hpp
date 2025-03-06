@@ -39,13 +39,14 @@ private:
 
     [[nodiscard]] bool HandleRequest();
 
-    void HandleGET(std::string_view path);
+    bool HandleGET(std::string_view path);
     void HandlePOST(std::string_view path, std::string_view body);
 
     HttpServer* m_server;
     tcp_pcb* m_pcb;
     bool m_tx_closed = false;
     bool m_rx_closed = false;
+    bool m_discard_inbound = false;
     std::array<char, 4096> m_buffer = {};
     size_t m_buffer_offset = 0;
     size_t m_parse_last_len = 0;
@@ -57,4 +58,6 @@ private:
     std::array<phr_header, 128> m_headers = {};
     size_t m_headers_size = 0;
     size_t m_body_size = 0;
+
+    friend HttpServer;
 };

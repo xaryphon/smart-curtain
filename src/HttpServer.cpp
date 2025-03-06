@@ -12,6 +12,7 @@ HttpServer::HttpServer(const ConstructionParameters& params)
     : m_pcb(nullptr)
     , m_params(params)
 {
+    xTaskCreate(TASK_KONDOM(HttpServer, TaskEntry), "HTTP_SUB", TaskStackSize::HTTP_SUB, this, TaskPriority::HTTP_SUB, nullptr);
 }
 
 HttpServer::~HttpServer()
@@ -201,4 +202,25 @@ err_t HttpServer::AcceptCallback(struct tcp_pcb* newpcb, err_t err)
     });
 
     return ERR_OK;
+}
+
+void HttpServer::TaskEntry()
+{
+    while (true) {
+        m_params.notify->Take(5000);
+        if (m_subscribed.empty()) {
+            continue;
+        }
+        std::string msg = fmt::format("data: {}\n", BuildBody(true, true));
+        for (HttpConnection* conn : m_subscribed) {
+            if (conn->m_pcb == nullptr) {
+                continue;
+            }
+
+            err_t err = tcp_write(conn->m_pcb, msg.c_str(), msg.size(), TCP_WRITE_FLAG_COPY);
+            if (err != ERR_OK) {
+                Logger::Log("tcp_write failed {}", err);
+            }
+        }
+    }
 }

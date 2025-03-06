@@ -46,6 +46,7 @@ HttpConnection::HttpConnection(const ConstructionParameters& params)
 
 HttpConnection::~HttpConnection()
 {
+    m_server->m_subscribed.remove(this);
 #if HTTP_ENABLE_DEBUG
     Logger::Log("HTTP: Closed");
 #endif
@@ -344,8 +345,9 @@ bool HttpConnection::HandleRequest()
 
     std::string_view method = { m_method, m_method_len };
     std::string_view path = { m_path, m_path_len };
+    bool keep_alive = false;
     if (method == "GET") {
-        HandleGET(path);
+        keep_alive = HandleGET(path);
     } else if (method == "POST") {
         HandlePOST(path, std::string_view(m_buffer.data() + m_headers_size, m_body_size));
     } else {
@@ -356,12 +358,14 @@ bool HttpConnection::HandleRequest()
     m_buffer_offset -= request_size;
     m_parse_last_len = 0;
 
-    ShutdownReceive();
-    ShutdownTransmit();
+    if (!keep_alive) {
+        ShutdownReceive();
+        ShutdownTransmit();
+    }
     return true;
 }
 
-void HttpConnection::HandleGET(std::string_view path)
+bool HttpConnection::HandleGET(std::string_view path)
 {
     if (path == "/status") {
         std::string body = m_server->BuildBody(true, false);
@@ -372,9 +376,23 @@ void HttpConnection::HandleGET(std::string_view path)
     } else if (path == "/status/full") {
         std::string body = m_server->BuildBody(true, true);
         RespondWith("200 OK", body.c_str());
+    } else if (path == "/subscribe") {
+        std::string msg = fmt::format(
+            "HTTP/1.1 200 OK\r\n"
+            "Connection: keep-alive\r\n"
+            "Content-Type: text/event-stream\r\n"
+            "\r\n"
+            "data: {}" /* contains implicit newline */
+            "\n",
+            m_server->BuildBody(true, true));
+        err_t err = tcp_write(m_pcb, msg.c_str(), msg.size(), TCP_WRITE_FLAG_COPY);
+        assert(err == ERR_OK);
+        m_server->m_subscribed.emplace_front(this);
+        return true;
     } else {
         RespondWith("404 Not Found", R"({"message":"Page not found"})");
     }
+    return false;
 }
 
 void HttpConnection::HandlePOST(std::string_view path, std::string_view body)
