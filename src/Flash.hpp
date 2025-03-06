@@ -14,8 +14,8 @@ class Flash {
     static constexpr ptrdiff_t FLASH_TOP = FLASH_BOTTOM + PICO_FLASH_SIZE_BYTES;
 
     using LuxType = float;
-    using ModeType = int8_t;
-    using MotorTargetType = int8_t;
+    using ModeType = uint8_t;
+    using MotorTargetType = uint8_t;
     using CRCType = uint16_t;
 
     static constexpr size_t LUX_LEN = sizeof(LuxType);
