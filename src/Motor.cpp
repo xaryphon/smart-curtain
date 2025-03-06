@@ -21,6 +21,7 @@ Motor::Motor(const Parameters& parameters)
     , m_v_command(parameters.v_command)
     , m_s_control_auto(parameters.s_control_auto)
     , m_v_belt_position(parameters.v_belt_position)
+    , m_storage(parameters.storage)
 {
     gpio_init(m_pin_step);
     gpio_set_dir(m_pin_step, GPIO_OUT);
@@ -67,10 +68,9 @@ std::string Motor::CommandString(const Motor::Command cmd)
     default:
         if (OPEN_COMPLETELY < cmd && cmd < CLOSE_COMPLETELY) {
             return fmt::format("{}%", static_cast<uint8_t>(cmd));
-        } else {
-            return "UNKNOWN";
         }
     }
+    return "UNKNOWN";
 }
 
 /// RIGHT
@@ -130,7 +130,7 @@ void Motor::Task()
     if (m_belt_max == 0) {
         m_s_control_auto->Take(0);
     } else {
-        m_s_control_auto->Give();
+        PermitAutomaticControl();
     }
     while (true) {
         m_v_command->Peek(&m_command, portMAX_DELAY);
@@ -157,8 +157,13 @@ void Motor::Task()
             ConcludeCommand();
             break;
         case CALIBRATE:
-            Calibrate();
+            if (!Calibrate()) {
+                m_belt_max = 0;
+            }
             ConcludeCommand();
+            if (m_belt_max != 0) {
+                PermitAutomaticControl();
+            }
             break;
         default:
             if (OPEN_COMPLETELY < m_command && m_command < CLOSE_COMPLETELY) {
@@ -248,6 +253,17 @@ void Motor::ConcludeCommand()
         // put it back
         m_v_command->Append(m_command, 0);
     }
+}
+
+void Motor::PermitAutomaticControl()
+{
+    m_storage->ReadOnlyAccessLocked(portMAX_DELAY, [&](const Flash::Settings& settings) {
+        if (settings.sys_mode & Flash::bAUTO) {
+            m_s_control_auto->Give();
+        } else {
+            m_v_command->Overwrite(Command { settings.motor_target });
+        }
+    });
 }
 
 /// TODO: remove

@@ -2,6 +2,7 @@
 
 #include "Queue.hpp"
 #include "Semaphore.hpp"
+#include "Storage.hpp"
 
 // Assuming pinout
 //  1. Step
@@ -44,16 +45,20 @@ public:
         RTOS::Variable<Command>* v_command;
         RTOS::Semaphore* s_control_auto;
         RTOS::Variable<uint8_t>* v_belt_position;
+
+        Storage* storage;
     };
 
     explicit Motor(const Parameters& parameters);
     [[nodiscard]] static std::string CommandString(Motor::Command cmd);
 
-    [[nodiscard]] int GetBeltPosition() const {
+    [[nodiscard]] int GetBeltPosition() const
+    {
         return m_belt_position;
     }
 
-    [[nodiscard]] int GetBeltMaximum() const {
+    [[nodiscard]] int GetBeltMaximum() const
+    {
         return m_belt_max;
     }
 
@@ -71,7 +76,8 @@ private:
     bool Close();
     bool MoveTo();
     void ConcludeCommand();
-    [[nodiscard]] uint8_t BeltPosition() const { return static_cast<uint8_t>(m_belt_position * 100 / m_belt_max); };
+    [[nodiscard]] uint8_t BeltPosition() const { return static_cast<uint8_t>(m_belt_position * 100 / m_belt_max); }
+    void PermitAutomaticControl();
 
     static constexpr int OUT_OF_BOUNDS_CLOSE = 30'000;
     static constexpr int OUT_OF_BOUNDS_OPEN = -10'000;
@@ -94,6 +100,7 @@ private:
     Command m_command = CALIBRATE;
     int m_belt_position = 0;
     int m_belt_max = 0;
+    Storage* m_storage;
 };
 
 /// TODO: Remove
