@@ -20,12 +20,11 @@ bool RTC::Set(const datetime_t& time)
 {
     std::lock_guard exclusive(m_access);
     datetime_t t = time;
-    if (rtc_set_datetime(&t)) {
+    if (!rtc_set_datetime(&t)) {
         Logger::Log("[RTC] Error: Set failed.");
         return false;
     }
-    m_is_set = true;
-    return m_is_set;
+    return true;
 }
 
 void RTC::SetAlarm(const datetime_t& time, const rtc_callback_t& callback)
