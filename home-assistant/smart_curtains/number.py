@@ -22,11 +22,13 @@ class SmartCurtainNumber(NumberEntity):
     _attr_native_step = 0.05
     _attr_native_max_value = 100000
     _attr_native_min_value = 0
+    _attr_should_poll = False
 
     def __init__(self, name, device, i):
         self._name = name
         self._device = device
         self._hour = i
+        device._entities.append(self)
 
     @property
     def name(self):

@@ -13,7 +13,8 @@ PLATFORMS = [Platform.COVER, Platform.SENSOR, Platform.NUMBER, Platform.SELECT, 
 type DeviceConfigEntry = ConfigEntry[Device]
 
 async def async_setup_entry(hass: HomeAssistant, entry: DeviceConfigEntry) -> bool:
-    entry.runtime_data = Device(hass, entry.data["url"])
+    device = Device(hass, entry.data["url"])
+    entry.runtime_data = device
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 

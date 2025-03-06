@@ -19,10 +19,12 @@ class SmartCurtainSensor(SensorEntity):
     _attr_device_class = SensorDeviceClass.ILLUMINANCE
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = "lx"
+    _attr_should_poll = False
 
     def __init__(self, name, device):
         self._name = name
         self._device = device
+        device._entities.append(self)
 
     @property
     def name(self):
@@ -38,10 +40,12 @@ class SmartCurtainSensor(SensorEntity):
 class SmartCurtainModeSensor(SensorEntity):
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_options = [x.value for x in DeviceMode]
+    _attr_should_poll = False
 
     def __init__(self, name, device):
         self._name = name
         self._device = device
+        device._entities.append(self)
 
     @property
     def name(self):

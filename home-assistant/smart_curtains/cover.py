@@ -16,11 +16,12 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, asyn
 class SmartCurtainCover(CoverEntity):
     _attr_device_class = CoverDeviceClass.CURTAIN
     _attr_supported_features = CoverEntityFeature.OPEN | CoverEntityFeature.CLOSE | CoverEntityFeature.SET_POSITION
-    _attr_has_entity_name = True
+    _attr_should_poll = False
 
     def __init__(self, name, device):
         self._name = name
         self._device = device
+        device._entities.append(self)
 
     @property
     def name(self):
@@ -51,6 +52,3 @@ class SmartCurtainCover(CoverEntity):
     def set_cover_position(self, **kwargs):
         position = int(kwargs['position'])
         self._device.send_settings({"wanted_mode": "manual", "manual": {"target": position}})
-
-    def update(self):
-        self._device.query_status()

@@ -3,6 +3,8 @@ import requests
 from homeassistant.core import HomeAssistant
 from enum import Enum
 from typing import Tuple
+import sseclient
+import json
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,6 +32,8 @@ class Device:
         self._manual_target = 0
         self._auto_static_target = 0
         self._auto_hourly_targets = [0 for _ in range(24)]
+        self._entities = []
+        hass.async_add_executor_job(self._subscribe)
 
     def update_from_data(self, json: dict):
         mode = json.get("mode")
@@ -51,6 +55,8 @@ class Device:
         self._auto_static_target = auto_static.get("target", self._auto_static_target)
         auto_hourly = json.get("auto_hourly", {})
         self._auto_hourly_targets = auto_hourly.get("targets", self._auto_hourly_targets)
+        for entity in self._entities:
+            entity.schedule_update_ha_state()
 
     @property
     def mode(self) -> DeviceMode:
@@ -122,3 +128,10 @@ class Device:
                 _LOGGER.error(f"Failed to send calibration command")
         except requests.exceptions.RequestException as e:
             _LOGGER.error(f"Error sending calibration command: {e}")
+
+    def _subscribe(self):
+        response = requests.get(f"{self._url}/subscribe", stream=True, headers={'Accept': 'text/event-stream'})
+        client = sseclient.SSEClient(response.iter_content())
+        for event in client.events():
+            data = json.loads(event.data)
+            self.update_from_data(data)

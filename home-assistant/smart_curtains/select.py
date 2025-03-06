@@ -16,9 +16,12 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, asyn
 
 class SmartCurtainSelect(SelectEntity):
     _attr_options = [x.value for x in (DeviceMode.MANUAL, DeviceMode.AUTO_STATIC, DeviceMode.AUTO_HOURLY)]
+    _attr_should_poll = False
+
     def __init__(self, name, device):
         self._name = name
         self._device = device
+        device._entities.append(self)
 
     @property
     def name(self):
