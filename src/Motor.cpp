@@ -255,8 +255,10 @@ void Motor::PermitAutomaticControl()
     m_storage->ReadOnlyAccessLocked(portMAX_DELAY, [&](const Flash::Settings& settings) {
         if (settings.sys_mode & Flash::bAUTO) {
             m_s_control_auto->Give();
+            Logger::Log("Control mode permitted to AUTO");
         } else {
             m_v_command->Overwrite(Command { settings.motor_target });
+            Logger::Log("Control mode MANUAL. Target {} %", settings.motor_target);
         }
     });
 }
