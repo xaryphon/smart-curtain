@@ -83,7 +83,7 @@ const char* Logger::GetTaskName()
 
 std::string Logger::FormatTime(const datetime_t& dt)
 {
-    if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
+    if (s_rtc->IsSet()) {
         return fmt::format("{} {:0>2}.{:0>2}.{} {:0>2}:{:0>2}:{:0>2}",
             s_rtc->DayOfWeekString(dt), dt.day, dt.month, dt.year, dt.hour, dt.min, dt.sec);
     }

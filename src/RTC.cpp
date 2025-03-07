@@ -13,7 +13,6 @@ RTC::RTC()
 {
     assert(!s_initialized);
     rtc_init();
-    Set(Default());
     s_initialized = true;
 }
 
@@ -21,7 +20,12 @@ bool RTC::Set(const datetime_t& time)
 {
     std::lock_guard exclusive(m_access);
     datetime_t t = time;
-    return rtc_set_datetime(&t);
+    if (!rtc_set_datetime(&t)) {
+        Logger::Log("[RTC] [Set] Invalid datetime_t.");
+        return false;
+    }
+    m_is_set = true;
+    return true;
 }
 
 void RTC::SetAlarm(const datetime_t& time, const rtc_callback_t& callback)
@@ -40,7 +44,7 @@ datetime_t RTC::GetDatetime()
 {
     std::lock_guard exclusive(m_access);
     datetime_t time;
-    if (s_initialized && rtc_get_datetime(&time)) {
+    if (s_initialized && m_is_set && rtc_get_datetime(&time)) {
         return time;
     }
     return Default();
@@ -89,21 +93,19 @@ datetime_t RTC::Default()
         default_month = 2,
         default_day = 28,
         default_weekday = 5,
-        default_hour = 23,
-        default_minute = 59,
-        default_sec = 59,
+        default_hour = 0,
+        default_minute = 0,
+        default_sec = 0,
     };
 
-    const uint64_t sys_time_s = time_us_64() / us_in_s;
-
     return {
-        .year = static_cast<int16_t>(default_year + (sys_time_s / s_in_y)),
-        .month = static_cast<int8_t>((default_month + sys_time_s / s_in_mon) % mon_in_y),
-        .day = static_cast<int8_t>((default_day + sys_time_s / s_in_d) % d_in_mon),
-        .dotw = static_cast<int8_t>((default_weekday + sys_time_s / s_in_d) % d_in_w),
-        .hour = static_cast<int8_t>((default_hour + sys_time_s / s_in_h) % h_in_d),
-        .min = static_cast<int8_t>((default_minute + sys_time_s / s_in_m) % m_in_h),
-        .sec = static_cast<int8_t>((default_sec + sys_time_s) % s_in_m),
+        .year = default_year,
+        .month = default_month,
+        .day = default_day,
+        .dotw = default_weekday,
+        .hour = default_hour,
+        .min = default_minute,
+        .sec = default_sec,
     };
 }
 
@@ -130,14 +132,15 @@ void test_task(void* params)
     auto* rtc = static_cast<test_params*>(params)->rtc;
     sema = static_cast<test_params*>(params)->sema;
     rtc->SetAlarm({
-        .year = -1,
-        .month = -1,
-        .day = -1,
-        .dotw = -1,
-        .hour = -1,
-        .min = -1,
-        .sec = 00, // every minute
-    }, alarm);
+                      .year = -1,
+                      .month = -1,
+                      .day = -1,
+                      .dotw = -1,
+                      .hour = -1,
+                      .min = -1,
+                      .sec = 00, // every minute
+                  },
+        alarm);
     while (true) {
         sema->Take(portMAX_DELAY);
         datetime_t time = rtc->GetDatetime();
