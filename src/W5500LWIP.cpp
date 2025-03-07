@@ -3,7 +3,7 @@
 #include <array>
 #include <cstring>
 
-#include <lwip/autoip.h>
+#include <lwip/dhcp.h>
 #include <lwip/tcpip.h>
 #include <netif/etharp.h>
 
@@ -46,7 +46,7 @@ W5500LWIP::W5500LWIP(SPI* spi, SPI::CS pin_cs, W5500::INT pin_int, W5500::RST pi
         memcpy(ip.data(), &ip_, sizeof(uint32_t));
         Logger::Log("W5500 {} {}.{}.{}.{}", netif_is_link_up(netif) ? "UP" : "DOWN", ip[0], ip[1], ip[2], ip[3]);
     });
-    autoip_start(&m_netif);
+    dhcp_start(&m_netif);
 }
 
 bool W5500LWIP::IsLinkUp()

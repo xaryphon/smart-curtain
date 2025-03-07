@@ -114,6 +114,7 @@ int main()
         .control_auto = control_auto,
         .auto_hourly = auto_hourly,
         .storage = storage,
+        .rtc = rtc,
     });
 
     late_main([spi_1, http]() {

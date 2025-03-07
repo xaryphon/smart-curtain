@@ -11,8 +11,8 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     device = config_entry.runtime_data
-    lux = SmartCurtainSensor(config_entry.data.get('name'), device)
-    mode = SmartCurtainModeSensor(config_entry.data.get('name'), device)
+    lux = SmartCurtainSensor("Ambient Light", device)
+    mode = SmartCurtainModeSensor("Current Mode", device)
     async_add_entities([lux, mode])
 
 class SmartCurtainSensor(SensorEntity):
