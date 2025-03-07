@@ -76,7 +76,8 @@ int main()
         .rtc = rtc,
     });
     new Logger({ .task_name = "Logger" });
-    new CLI({ .task_name = "CLI",
+    new CLI({
+        .task_name = "CLI",
 
         .v_lux_target = lux_target,
         .v_motor_command = motor_command,
