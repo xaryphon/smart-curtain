@@ -46,6 +46,7 @@ HttpConnection::HttpConnection(const ConstructionParameters& params)
 
 HttpConnection::~HttpConnection()
 {
+    m_server->m_subscribed.remove(this);
 #if HTTP_ENABLE_DEBUG
     Logger::Log("HTTP: Closed");
 #endif
@@ -344,8 +345,9 @@ bool HttpConnection::HandleRequest()
 
     std::string_view method = { m_method, m_method_len };
     std::string_view path = { m_path, m_path_len };
+    bool keep_alive = false;
     if (method == "GET") {
-        HandleGET(path);
+        keep_alive = HandleGET(path);
     } else if (method == "POST") {
         HandlePOST(path, std::string_view(m_buffer.data() + m_headers_size, m_body_size));
     } else {
@@ -356,12 +358,14 @@ bool HttpConnection::HandleRequest()
     m_buffer_offset -= request_size;
     m_parse_last_len = 0;
 
-    ShutdownReceive();
-    ShutdownTransmit();
+    if (!keep_alive) {
+        ShutdownReceive();
+        ShutdownTransmit();
+    }
     return true;
 }
 
-void HttpConnection::HandleGET(std::string_view path)
+bool HttpConnection::HandleGET(std::string_view path)
 {
     if (path == "/status") {
         std::string body = m_server->BuildBody(true, false);
@@ -372,30 +376,50 @@ void HttpConnection::HandleGET(std::string_view path)
     } else if (path == "/status/full") {
         std::string body = m_server->BuildBody(true, true);
         RespondWith("200 OK", body.c_str());
+    } else if (path == "/subscribe") {
+        std::string msg = fmt::format(
+            "HTTP/1.1 200 OK\r\n"
+            "Connection: keep-alive\r\n"
+            "Content-Type: text/event-stream\r\n"
+            "\r\n"
+            "data: {}" /* contains implicit newline */
+            "\n",
+            m_server->BuildBody(true, true));
+        err_t err = tcp_write(m_pcb, msg.c_str(), msg.size(), TCP_WRITE_FLAG_COPY);
+        assert(err == ERR_OK);
+        m_server->m_subscribed.emplace_front(this);
+        return true;
     } else {
         RespondWith("404 Not Found", R"({"message":"Page not found"})");
     }
+    return false;
 }
 
 void HttpConnection::HandlePOST(std::string_view path, std::string_view body)
 {
+    enum class Mode {
+        UNKNOWN,
+        MANUAL,
+        AUTO_STATIC,
+        AUTO_HOURLY,
+    };
+
     if (path == "/settings") {
         ArduinoJson::JsonDocument doc;
         ArduinoJson::deserializeJson(doc, body);
 
-        uint8_t next_mode = 0;
-        float manual_target = NAN;
-        int manual_target_raw = -1;
+        Mode next_mode = Mode::UNKNOWN;
+        int manual_target = -1;
         float static_target = NAN;
         std::array<float, 24> hourly_targets = { NAN };
 
         if (std::string_view wanted_mode = doc["wanted_mode"]; !wanted_mode.empty()) {
             if (wanted_mode == "manual") {
-                next_mode = 1;
+                next_mode = Mode::MANUAL;
             } else if (wanted_mode == "auto_static") {
-                next_mode = 2;
+                next_mode = Mode::AUTO_STATIC;
             } else if (wanted_mode == "auto_hourly") {
-                next_mode = 3;
+                next_mode = Mode::AUTO_HOURLY;
             } else {
                 RespondWith("400 Bad Request", R"({"message": "Invalid wanted_mode"})");
                 return;
@@ -406,19 +430,17 @@ void HttpConnection::HandlePOST(std::string_view path, std::string_view body)
                 RespondWith("400 Bad Request", R"({"message": "Invalid manual"})");
                 return;
             }
-            if (ArduinoJson::JsonVariantConst target_ = manual["target"]) {
-                if (!target_.is<float>()) {
+            if (ArduinoJson::JsonVariantConst target_ = manual["target"]; !target_.isNull()) {
+                if (!target_.is<int>()) {
                     RespondWith("400 Bad Request", R"({"message": "Invalid manual.target"})");
                     return;
                 }
                 manual_target = target_;
-            }
-            if (ArduinoJson::JsonVariantConst target_ = manual["target_raw"]) {
-                if (!target_.is<int>()) {
-                    RespondWith("400 Bad Request", R"({"message": "Invalid manual.target_raw"})");
-                    return;
+                if (manual_target < 0) {
+                    manual_target = 0;
+                } else if (manual_target > 100) {
+                    manual_target = 100;
                 }
-                manual_target_raw = target_;
             }
         }
         if (ArduinoJson::JsonVariantConst auto_static = doc["auto_static"]) {
@@ -426,7 +448,7 @@ void HttpConnection::HandlePOST(std::string_view path, std::string_view body)
                 RespondWith("400 Bad Request", R"({"message": "Invalid auto_static"})");
                 return;
             }
-            if (ArduinoJson::JsonVariantConst target_ = auto_static["target"]) {
+            if (ArduinoJson::JsonVariantConst target_ = auto_static["target"]; !target_.isNull()) {
                 if (!target_.is<float>()) {
                     RespondWith("400 Bad Request", R"({"message": "Invalid auto_static"})");
                     return;
@@ -459,31 +481,67 @@ void HttpConnection::HandlePOST(std::string_view path, std::string_view body)
                 }
             }
         }
-        if (!std::isnan(manual_target) && manual_target_raw >= 0) {
-            RespondWith("400 Bad Request", R"({"message": "manual.target and manual.target_raw are mutually exclusive"})");
-            return;
-        }
 
-        if (next_mode != 0) {
-            Logger::Log("Setting mode to {}", next_mode);
-        }
-        if (!std::isnan(manual_target)) {
-            Logger::Log("Setting manual_target to {}%", manual_target * 100.0f);
-        }
-        if (manual_target_raw >= 0) {
-            Logger::Log("Setting manual_target to {}", manual_target_raw);
-        }
-        if (!std::isnan(static_target)) {
-            Logger::Log("Setting static_target to {}", static_target);
-        }
-        if (!std::isnan(hourly_targets[0])) {
-            Logger::Log("Setting hourly_targets something");
-        }
+        m_server->m_params.storage->WriteAccessAndProgramLocked(portMAX_DELAY, [&](Flash::Settings& settings) {
+            Mode current_mode = Mode::UNKNOWN;
+
+            if (next_mode != Mode::UNKNOWN) {
+                int mode = 0;
+                if (next_mode == Mode::AUTO_STATIC) {
+                    mode = Flash::bAUTO;
+                    m_server->m_params.control_auto->Give();
+                    m_server->m_params.auto_hourly->Take(0);
+                    current_mode = Mode::AUTO_STATIC;
+                } else if (next_mode == Mode::AUTO_HOURLY) {
+                    mode = Flash::bAUTO | Flash::bAUTO_HOURLY;
+                    m_server->m_params.control_auto->Give();
+                    m_server->m_params.auto_hourly->Give();
+                    current_mode = Mode::AUTO_HOURLY;
+                } else {
+                    m_server->m_params.control_auto->Take(0);
+                    m_server->m_params.auto_hourly->Take(0);
+                    current_mode = Mode::MANUAL;
+                }
+                settings.sys_mode = Flash::SystemMode(mode);
+            }
+
+            if (current_mode == Mode::UNKNOWN) {
+                if (m_server->m_params.control_auto->Count() == 0) {
+                    current_mode = Mode::MANUAL;
+                } else if (m_server->m_params.auto_hourly->Count() == 0) {
+                    current_mode = Mode::AUTO_STATIC;
+                } else {
+                    current_mode = Mode::AUTO_HOURLY;
+                }
+            }
+
+            if (manual_target != -1) {
+                settings.motor_target = static_cast<int8_t>(manual_target);
+                if (current_mode == Mode::MANUAL) {
+                    m_server->m_params.motor_command->Overwrite(Motor::Command(manual_target));
+                }
+            } else if (next_mode == Mode::MANUAL) {
+                m_server->m_params.motor_command->Overwrite(Motor::Command(settings.motor_target));
+            }
+
+            if (!std::isnan(static_target)) {
+                settings.lux_targets[Flash::LUX_STATIC] = static_target;
+                if (current_mode != Mode::AUTO_HOURLY) {
+                    m_server->m_params.lux_target->Overwrite(static_target);
+                }
+            }
+
+            if (!std::isnan(hourly_targets[0])) {
+                for (size_t i = 0; i < 24; i++) {
+                    settings.lux_targets[Flash::H00 + i] = hourly_targets.at(i);
+                }
+            }
+        });
 
         std::string res_body = m_server->BuildBody(false, true);
         RespondWith("200 OK", res_body.c_str());
     } else if (path == "/calibrate") {
-        Logger::Log("Start calibration");
+        m_server->m_params.motor_command->Overwrite(Motor::Command::CALIBRATE);
         RespondWith("202 Accepted", R"({})");
     } else {
         RespondWith("404 Not Found", R"({"message":"Page not found"})");

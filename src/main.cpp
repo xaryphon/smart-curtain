@@ -112,6 +112,8 @@ int main()
         .motor_command = motor_command,
         .lux_target = lux_target,
         .control_auto = control_auto,
+        .auto_hourly = auto_hourly,
+        .storage = storage,
     });
 
     late_main([spi_1, http]() {

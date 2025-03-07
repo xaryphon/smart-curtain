@@ -12,6 +12,7 @@ HttpServer::HttpServer(const ConstructionParameters& params)
     : m_pcb(nullptr)
     , m_params(params)
 {
+    xTaskCreate(TASK_KONDOM(HttpServer, TaskEntry), "HTTP_SUB", TaskStackSize::HTTP_SUB, this, TaskPriority::HTTP_SUB, nullptr);
 }
 
 HttpServer::~HttpServer()
@@ -72,9 +73,10 @@ std::string HttpServer::BuildBody(bool include_status, bool include_settings)
             mode = "calibrating";
         } else if (m_params.control_auto->Count() == 0) {
             mode = "manual";
-        } else {
+        } else if (m_params.auto_hourly->Count() == 0) {
             mode = "auto_static";
-            // TODO: Check static vs hourly
+        } else {
+            mode = "auto_hourly";
         }
         fmt::format_to(ins, R"("mode":"{}",)", mode);
         fmt::format_to(ins, R"("motor":{{)");
@@ -91,13 +93,22 @@ std::string HttpServer::BuildBody(bool include_status, bool include_settings)
             motor_percent = 0;
             motor_target = 0;
         } else if (motor_command == Motor::Command::STOP) {
-            motor_target = motor_percent;
-        } else if (motor_command == Motor::Command::OPEN_COMPLETELY) {
+            if (motor_max == -1) {
+                motor_target = 0;
+            } else {
+                motor_target = motor_percent;
+            }
+        } else if (motor_command == Motor::Command::OPEN) {
             motor_target = 100;
-        } else if (motor_command == Motor::Command::CLOSE_COMPLETELY) {
+        } else if (motor_command == Motor::Command::CLOSE) {
             motor_target = 0;
         } else {
             motor_target = 100 - motor_command;
+        }
+        if (motor_target < 0) {
+            motor_target = 0;
+        } else if (motor_target > 100) {
+            motor_target = 100;
         }
         assert(motor_target >= 0 && motor_target <= 100);
         fmt::format_to(ins, R"("target":{},)", motor_target);
@@ -141,19 +152,35 @@ std::string HttpServer::BuildBody(bool include_status, bool include_settings)
         if (body.size() != 1) {
             body += ',';
         }
-        // TODO: Get values from storage
-        fmt::format_to(ins, R"("wanted_mode":"{}",)", "manual");
+        const char* mode = "unknown";
+        int manual_target = 0;
+        std::array<float, 25> auto_targets = { 0 };
+        m_params.storage->ReadOnlyAccessLocked(portMAX_DELAY,
+            [&](const Flash::Settings& settings) -> void {
+                if (settings.sys_mode & Flash::bAUTO) {
+                    if (settings.sys_mode & Flash::bAUTO_HOURLY) {
+                        mode = "auto_hourly";
+                    } else {
+                        mode = "auto_static";
+                    }
+                } else {
+                    mode = "manual";
+                }
+                manual_target = +settings.motor_target;
+                static_assert(sizeof(auto_targets) == sizeof(settings.lux_targets));
+                memcpy(auto_targets.data(), settings.lux_targets, auto_targets.size() * sizeof(float));
+            });
+        fmt::format_to(ins, R"("wanted_mode":"{}",)", mode);
         fmt::format_to(ins, R"("manual":{{)");
-        fmt::format_to(ins, R"("target":{},)", 0.0f);
-        fmt::format_to(ins, R"("target_raw":{})", 0);
+        fmt::format_to(ins, R"("target":{})", manual_target);
         fmt::format_to(ins, "}},");
-        fmt::format_to(ins, R"("auto_static":{{"target":{}}},)", 0.0f);
+        fmt::format_to(ins, R"("auto_static":{{"target":{}}},)", auto_targets[Flash::LUX_STATIC]);
         fmt::format_to(ins, R"("auto_hourly":{{"targets":[)");
         for (int i = 0; i < 24; i++) {
             if (i != 0) {
                 body += ',';
             }
-            fmt::format_to(ins, R"({})", static_cast<float>(1 << i) / 10.0f);
+            fmt::format_to(ins, R"({})", auto_targets.at(Flash::H00 + i));
         }
         fmt::format_to(ins, "]}}");
     }
@@ -175,4 +202,25 @@ err_t HttpServer::AcceptCallback(struct tcp_pcb* newpcb, err_t err)
     });
 
     return ERR_OK;
+}
+
+void HttpServer::TaskEntry()
+{
+    while (true) {
+        m_params.notify->Take(pdMS_TO_TICKS(5000));
+        if (m_subscribed.empty()) {
+            continue;
+        }
+        std::string msg = fmt::format("data: {}\n", BuildBody(true, true));
+        for (HttpConnection* conn : m_subscribed) {
+            if (conn->m_pcb == nullptr) {
+                continue;
+            }
+
+            err_t err = tcp_write(conn->m_pcb, msg.c_str(), msg.size(), TCP_WRITE_FLAG_COPY);
+            if (err != ERR_OK) {
+                Logger::Log("tcp_write failed {}", err);
+            }
+        }
+    }
 }
