@@ -99,6 +99,7 @@ int main()
         .v_command = motor_command,
         .s_control_auto = control_auto,
         .v_belt_position = belt_position,
+        .storage = storage,
     });
     auto* http = new HttpServer({
         .port = 80,

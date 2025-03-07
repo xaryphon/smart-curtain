@@ -21,6 +21,7 @@ Motor::Motor(const Parameters& parameters)
     , m_v_command(parameters.v_command)
     , m_s_control_auto(parameters.s_control_auto)
     , m_v_belt_position(parameters.v_belt_position)
+    , m_storage(parameters.storage)
 {
     gpio_init(m_pin_step);
     gpio_set_dir(m_pin_step, GPIO_OUT);
@@ -49,6 +50,7 @@ Motor::Motor(const Parameters& parameters)
         Logger::Log("Error: Failed to created task [{}]", parameters.name);
     }
     m_s_control_auto->Take(0);
+    m_v_command->Overwrite(CALIBRATE);
 }
 
 std::string Motor::CommandString(const Motor::Command cmd)
@@ -67,10 +69,9 @@ std::string Motor::CommandString(const Motor::Command cmd)
     default:
         if (OPEN_COMPLETELY < cmd && cmd < CLOSE_COMPLETELY) {
             return fmt::format("{}%", static_cast<uint8_t>(cmd));
-        } else {
-            return "UNKNOWN";
         }
     }
+    return "UNKNOWN";
 }
 
 /// RIGHT
@@ -126,12 +127,6 @@ bool Motor::StepCCW() // NOLINT(readability-make-member-function-const)
 void Motor::Task()
 {
     Logger::Log("Initiated");
-    Calibrate();
-    if (m_belt_max == 0) {
-        m_s_control_auto->Take(0);
-    } else {
-        m_s_control_auto->Give();
-    }
     while (true) {
         m_v_command->Peek(&m_command, portMAX_DELAY);
         if (m_belt_max == 0 && m_command != CALIBRATE) {
@@ -157,8 +152,13 @@ void Motor::Task()
             ConcludeCommand();
             break;
         case CALIBRATE:
-            Calibrate();
+            if (!Calibrate()) {
+                m_belt_max = 0;
+            }
             ConcludeCommand();
+            if (m_belt_max != 0) {
+                PermitAutomaticControl();
+            }
             break;
         default:
             if (OPEN_COMPLETELY < m_command && m_command < CLOSE_COMPLETELY) {
@@ -248,6 +248,19 @@ void Motor::ConcludeCommand()
         // put it back
         m_v_command->Append(m_command, 0);
     }
+}
+
+void Motor::PermitAutomaticControl()
+{
+    m_storage->ReadOnlyAccessLocked(portMAX_DELAY, [&](const Flash::Settings& settings) {
+        if (settings.sys_mode & Flash::bAUTO) {
+            m_s_control_auto->Give();
+            Logger::Log("Control mode permitted to AUTO");
+        } else {
+            m_v_command->Overwrite(Command { settings.motor_target });
+            Logger::Log("Control mode MANUAL. Target {} %", settings.motor_target);
+        }
+    });
 }
 
 /// TODO: remove

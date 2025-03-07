@@ -52,12 +52,17 @@ std::string Storage::StringifySettings(const Settings& settings)
 void Storage::Task()
 {
     Logger::Log("Initiated");
-    ReadOnlyAccessLocked(portMAX_DELAY, [&](const Settings& settings) {
-        if (settings.sys_mode & bAUTO_HOURLY) {
-            s_lux_target_auto->Give();
-        }
-        Logger::Log("Flash {}", StringifySettings(settings));
-    });
+    {
+        Settings flash_settings;
+        ReadOnlyAccessLocked(portMAX_DELAY, [&](const Settings& settings) {
+            flash_settings = settings;
+            if (!(settings.sys_mode & bAUTO_HOURLY)) {
+                s_lux_target_auto->Take(0);
+                m_lux_target->Overwrite(settings.lux_targets[LUX_STATIC]);
+            }
+        });
+        Logger::Log("Flash {}", StringifySettings(flash_settings));
+    }
     m_rtc->SetAlarm(ALARM_TIME, AlarmEvent);
     while (true) {
         s_update_lux->Take(portMAX_DELAY);
