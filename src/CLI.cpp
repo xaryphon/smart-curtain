@@ -12,6 +12,7 @@ CLI::CLI(const Parameters& parameters)
     : m_v_lux_target(parameters.v_lux_target)
     , m_v_motor_command(parameters.v_motor_command)
     , m_s_control_auto(parameters.s_control_auto)
+    , m_s_auto_hourly(parameters.s_auto_hourly)
     , m_storage(parameters.storage)
     , m_rtc(parameters.rtc)
 {
@@ -43,7 +44,7 @@ bool CLI::ReadInput()
 void CLI::ProcessCommand()
 {
     std::string cmd;
-    Logger::Log("[{}]", m_input.str());
+    Logger::Log("Input: [{}]", m_input.str());
     m_input >> cmd;
     if (cmd == "help") {
         HelpCommand();
@@ -147,8 +148,7 @@ void CLI::HelpCommand()
 
 void CLI::StatusCommand()
 {
-    /// TODO get status info from relevant task(s), simple/advanced status display etc.
-    Logger::Log("status: ok\ntarget: 69");
+    /// TODO get additional status info from relevant task(s), simple/advanced status display
     Flash::Settings flash_settings {};
     m_storage->ReadOnlyAccessLocked(portMAX_DELAY, [&](const Flash::Settings& settings) {
         flash_settings = settings;
@@ -160,8 +160,11 @@ void CLI::TargetCommand()
 {
     float target = 0;
     int hour = 0;
-    if (m_input >> target && m_input >> hour) {
-        // lol dont care magic numbers ahoy
+    if (!(m_input >> target)) {
+        Logger::Log("target: missing target value");
+        return;
+    }
+    if (m_input >> hour) {
         if (target >= 0 && target <= FLT_MAX && hour >= 0 && hour <= 23) {
             Logger::Log("Lux target for hour {} set to {}", hour, target);
             m_v_lux_target->Overwrite(target);
@@ -177,8 +180,6 @@ void CLI::TargetCommand()
             settings.lux_targets[Flash::Lux::LUX_STATIC] = target;
         });
         Logger::Log("Static lux target set to {}", target);
-    } else {
-        Logger::Log("target: missing target value");
     }
 }
 
@@ -186,11 +187,13 @@ void CLI::MotorCommand()
 {
     std::string motor_cmd;
     Motor::Command current = Motor::STOP;
+    Motor::Command new_target = Motor::STOP;
     m_v_motor_command->Peek(&current, 0);
     if (current != Motor::CALIBRATE) {
         if (m_input >> motor_cmd) {
             if (motor_cmd == "manual") {
                 m_s_control_auto->Take(0);
+                m_s_auto_hourly->Take(0);
                 m_storage->WriteAccessAndProgramLocked(portMAX_DELAY, [&](Flash::Settings& settings) {
                     settings.sys_mode = 0;
                 });
@@ -201,18 +204,23 @@ void CLI::MotorCommand()
                 });
             } else if (motor_cmd == "hourly") {
                 m_s_control_auto->Give();
+                m_s_auto_hourly->Give();
                 m_storage->WriteAccessAndProgramLocked(portMAX_DELAY, [&](Flash::Settings& settings) {
                     settings.sys_mode = Flash::bAUTO_HOURLY | Flash::bAUTO;
                 });
             } else if (motor_cmd == "calibrate") {
                 m_v_motor_command->Overwrite(Motor::CALIBRATE);
             } else {
-                m_s_control_auto->Take(0);
-                Motor::Command const new_target = MotorStringToTarget(motor_cmd);
-                m_v_motor_command->Overwrite(new_target);
-                m_storage->WriteAccessAndProgramLocked(portMAX_DELAY, [&](Flash::Settings& settings) {
-                    settings.motor_target = new_target;
-                });
+                new_target = MotorStringToTarget(motor_cmd);
+                if (new_target != static_cast<Motor::Command>(-1)) {
+                    m_s_control_auto->Take(0);
+                    m_v_motor_command->Overwrite(new_target);
+                    m_storage->WriteAccessAndProgramLocked(portMAX_DELAY, [&](Flash::Settings& settings) {
+                        settings.motor_target = new_target;
+                    });
+                } else {
+                    Logger::Log("motor - invalid command, see 'help motor' for additional info");
+                }
             }
         } else {
             Logger::Log("motor - missing motor command, see 'help motor' for additional info");
@@ -232,11 +240,9 @@ Motor::Command CLI::MotorStringToTarget(const std::string& str)
     }
     char dummy[] = { 0 };
     int num;
-    if (((sscanf(str.c_str(), "%d%c", &num, dummy) == 1 && dummy[0] == '\0')) && (Motor::CLOSE_COMPLETELY >= num && Motor::OPEN_COMPLETELY <= num)) {
-        printf("\n%d\n", num);
+    if (((sscanf(str.c_str(), "%d%c", &num, dummy) == 1)) && (Motor::CLOSE_COMPLETELY >= num && Motor::OPEN_COMPLETELY <= num)) {
         return static_cast<Motor::Command>(num);
     }
-    printf("\n%d\n", num);
     return static_cast<Motor::Command>(-1);
 }
 
@@ -250,7 +256,7 @@ void CLI::DatetimeCommand()
     int min = 0;
     int sec = 0;
     /// TODO add input checking
-    if (m_input >> year, m_input >> month, m_input >> day, m_input >> dotw, m_input >> hour, m_input >> min, m_input >> sec) {
+    if (m_input >> year && m_input >> month && m_input >> day && m_input >> dotw && m_input >> hour && m_input >> min && m_input >> sec) {
         datetime_t datetime = m_rtc->GetDatetime();
         datetime.year = static_cast<int16_t>(year),
         datetime.month = static_cast<int8_t>(month),
@@ -271,7 +277,7 @@ void CLI::DateCommand()
     int month = 0;
     int day = 0;
     int dotw = 0;
-    if (m_input >> year, m_input >> month, m_input >> day, m_input >> dotw) {
+    if (m_input >> year && m_input >> month && m_input >> day && m_input >> dotw) {
         datetime_t datetime = m_rtc->GetDatetime();
         datetime.year = static_cast<int16_t>(year),
         datetime.month = static_cast<int8_t>(month),
@@ -333,7 +339,7 @@ void CLI::TimeCommand()
     int hour = 0;
     int min = 0;
     int sec = 0;
-    if (m_input >> hour, m_input >> min, m_input >> sec) {
+    if (m_input >> hour && m_input >> min && m_input >> sec) {
         datetime_t datetime = m_rtc->GetDatetime();
         datetime.hour = static_cast<int8_t>(hour);
         datetime.min = static_cast<int8_t>(min);

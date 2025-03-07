@@ -25,6 +25,7 @@ public:
         RTOS::Variable<float>* v_lux_target;
         RTOS::Variable<Motor::Command>* v_motor_command;
         RTOS::Semaphore* s_control_auto;
+        RTOS::Semaphore* s_auto_hourly;
         Storage* storage;
         RTC* rtc;
     };
@@ -55,6 +56,7 @@ private:
     RTOS::Variable<float>* m_v_lux_target;
     RTOS::Variable<Motor::Command>* m_v_motor_command;
     RTOS::Semaphore* m_s_control_auto;
+    RTOS::Semaphore* m_s_auto_hourly;
     Storage* m_storage;
     RTC* m_rtc;
 
