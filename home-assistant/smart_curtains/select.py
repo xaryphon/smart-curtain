@@ -11,7 +11,7 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     device = config_entry.runtime_data
-    select = SmartCurtainSelect(config_entry.data.get('name'), device)
+    select = SmartCurtainSelect("Mode", device)
     async_add_entities([select])
 
 class SmartCurtainSelect(SelectEntity):

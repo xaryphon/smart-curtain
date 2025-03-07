@@ -11,8 +11,8 @@ _LOGGER = logging.getLogger(__name__)
 async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     name = config_entry.data.get('name')
     device = config_entry.runtime_data
-    numbers = [SmartCurtainNumber(f"{name} {i:02}h", device, i) for i in range(24)]
-    numbers.append(SmartCurtainNumber(f"{name} static", device, None))
+    numbers = [SmartCurtainNumber(f" Static", device, None)]
+    numbers += [SmartCurtainNumber(f"Hour {i:02}", device, i) for i in range(24)]
     async_add_entities(numbers)
 
 class SmartCurtainNumber(NumberEntity):
