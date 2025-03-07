@@ -21,9 +21,10 @@ bool RTC::Set(const datetime_t& time)
     std::lock_guard exclusive(m_access);
     datetime_t t = time;
     if (!rtc_set_datetime(&t)) {
-        Logger::Log("[RTC] Error: Set failed.");
+        Logger::Log("[RTC] [Set] Invalid datetime_t.");
         return false;
     }
+    m_is_set = true;
     return true;
 }
 
@@ -92,21 +93,19 @@ datetime_t RTC::Default()
         default_month = 2,
         default_day = 28,
         default_weekday = 5,
-        default_hour = 23,
-        default_minute = 59,
-        default_sec = 59,
+        default_hour = 0,
+        default_minute = 0,
+        default_sec = 0,
     };
 
-    const uint64_t sys_time_s = time_us_64() / us_in_s;
-
     return {
-        .year = static_cast<int16_t>(default_year + (sys_time_s / s_in_y)),
-        .month = static_cast<int8_t>((default_month + sys_time_s / s_in_mon) % mon_in_y),
-        .day = static_cast<int8_t>((default_day + sys_time_s / s_in_d) % d_in_mon),
-        .dotw = static_cast<int8_t>((default_weekday + sys_time_s / s_in_d) % d_in_w),
-        .hour = static_cast<int8_t>((default_hour + sys_time_s / s_in_h) % h_in_d),
-        .min = static_cast<int8_t>((default_minute + sys_time_s / s_in_m) % m_in_h),
-        .sec = static_cast<int8_t>((default_sec + sys_time_s) % s_in_m),
+        .year = default_year,
+        .month = default_month,
+        .day = default_day,
+        .dotw = default_weekday,
+        .hour = default_hour,
+        .min = default_minute,
+        .sec = default_sec,
     };
 }
 

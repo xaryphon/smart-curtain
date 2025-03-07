@@ -15,7 +15,6 @@ public:
     [[nodiscard]] static const char* DayOfWeekString(const datetime_t& time);
     [[nodiscard]] static const char* MonthString(const datetime_t& time);
     [[nodiscard]] bool IsSet() const { return m_is_set; }
-    void SetState(bool state) { m_is_set = state; }
 
 private:
     [[nodiscard]] static datetime_t Default();
