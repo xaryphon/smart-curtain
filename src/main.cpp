@@ -112,6 +112,7 @@ int main()
         .v_belt_position = belt_position,
         .s_http_notify = http_notify,
         .storage = storage,
+        .red = red,
     });
     auto* http = new HttpServer({
         .port = 80,

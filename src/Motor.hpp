@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Indicator.hpp"
 #include "Queue.hpp"
 #include "Semaphore.hpp"
 #include "Storage.hpp"
@@ -48,6 +49,7 @@ public:
         RTOS::Semaphore* s_http_notify;
 
         Storage* storage;
+        Indicator* red;
     };
 
     explicit Motor(const Parameters& parameters);
@@ -103,6 +105,7 @@ private:
     int m_belt_position = 0;
     int m_belt_max = 0;
     Storage* m_storage;
+    Indicator* m_red;
 };
 
 /// TODO: Remove
