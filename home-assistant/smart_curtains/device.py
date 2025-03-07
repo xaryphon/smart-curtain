@@ -151,9 +151,16 @@ class Device:
             _LOGGER.error(f"Error sending calibration command: {e}")
 
     def _subscribe(self):
-        self.send_settings({}) # update the datetime
-        response = requests.get(f"{self._url}/subscribe", stream=True, headers={'Accept': 'text/event-stream'})
-        client = sseclient.SSEClient(response.iter_content())
-        for event in client.events():
-            data = json.loads(event.data)
-            self.update_from_data(data)
+        while True:
+            try:
+                self.send_settings({}) # update the datetime
+                response = requests.get(f"{self._url}/subscribe",
+                                        stream=True,
+                                        headers={'Accept': 'text/event-stream'},
+                                        timeout=10)
+                client = sseclient.SSEClient(response.iter_content())
+                for event in client.events():
+                    data = json.loads(event.data)
+                    self.update_from_data(data)
+            except requests.exceptions.RequestException as e:
+                _LOGGER.error(f"Connection timed out, retrying: {e}")
