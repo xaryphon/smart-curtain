@@ -5,6 +5,7 @@ from enum import Enum
 from typing import Tuple
 import sseclient
 import json
+from datetime import datetime
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -64,11 +65,11 @@ class Device:
 
     @property
     def motor_target(self) -> int:
-        return self._motor_target
+        return 100 - self._motor_target
 
     @property
     def motor_current(self) -> int:
-        return self._motor_current
+        return 100 - self._motor_current
 
     @property
     def lux_target(self) -> float:
@@ -108,7 +109,27 @@ class Device:
         except requests.exceptions.RequestException as e:
             _LOGGER.error(f"Error trying to query device status: {e}")
 
+    def get_timestamp(self) -> Tuple[int, int]:
+        now = datetime.now()
+        v = now.year
+        v *= 12
+        v += now.month - 1
+        v *= 31
+        v += now.day - 1
+        v *= 7
+        v += (now.weekday() + 1) % 7 # pico-sdk has sunday==0 but python has monday==0
+        v *= 24
+        v += now.hour
+        v *= 60
+        v += now.minute
+        v *= 60
+        v += now.second
+        high = (v >> 32) & 0xffffffff
+        low = v & 0xffffffff
+        return (high, low)
+
     def send_settings(self, data: dict):
+        data["time_high"], data["time_low"] = self.get_timestamp()
         try:
             response = requests.post(f"{self._url}/settings", json=data)
             if response.status_code == 200:
@@ -130,8 +151,16 @@ class Device:
             _LOGGER.error(f"Error sending calibration command: {e}")
 
     def _subscribe(self):
-        response = requests.get(f"{self._url}/subscribe", stream=True, headers={'Accept': 'text/event-stream'})
-        client = sseclient.SSEClient(response.iter_content())
-        for event in client.events():
-            data = json.loads(event.data)
-            self.update_from_data(data)
+        while True:
+            try:
+                self.send_settings({}) # update the datetime
+                response = requests.get(f"{self._url}/subscribe",
+                                        stream=True,
+                                        headers={'Accept': 'text/event-stream'},
+                                        timeout=10)
+                client = sseclient.SSEClient(response.iter_content())
+                for event in client.events():
+                    data = json.loads(event.data)
+                    self.update_from_data(data)
+            except requests.exceptions.RequestException as e:
+                _LOGGER.error(f"Connection timed out, retrying: {e}")

@@ -17,7 +17,7 @@ class SmartCurtainButton(ButtonEntity):
     _attr_should_poll = False
 
     def __init__(self, name, device):
-        self._name = name + " Calibrate"
+        self._name = "Calibrate"
         self._device = device
         device._entities.append(self)
 

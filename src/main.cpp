@@ -9,6 +9,7 @@
 #include "CLI.hpp"
 #include "HttpServer.hpp"
 #include "I2C.hpp"
+#include "Indicator.hpp"
 #include "Logger.hpp"
 #include "Motor.hpp"
 #include "Primitive.hpp"
@@ -17,10 +18,17 @@
 #include "W5500LWIP.hpp"
 #include "config.h"
 
+static constexpr uint TASK_ACTIVITY_INDICATOR_LED_PIN = 16;
+
 extern "C" {
 uint32_t read_runtime_ctr(void)
 {
     return timer_hw->timerawl;
+}
+
+void SetTaskActivityIndicatorLedStateBasedOnCurrentTaskPriority(int current_task_priority)
+{
+    gpio_put(TASK_ACTIVITY_INDICATOR_LED_PIN, current_task_priority != tskIDLE_PRIORITY);
 }
 }
 
@@ -46,6 +54,9 @@ int main()
     auto* rtc = new RTC();
     Logger::Initialize({ .rtc = rtc });
     Logger::Log("Boot");
+
+    gpio_init(TASK_ACTIVITY_INDICATOR_LED_PIN);
+    gpio_set_dir(TASK_ACTIVITY_INDICATOR_LED_PIN, GPIO_OUT);
 
     /// Serial Interfaces
     const auto i2c_1 = std::make_unique<I2C>(I2C::SDA1::PIN_2, I2C::SCL1::PIN_3, BH1750::BAUDRATE_MAX);
@@ -75,6 +86,10 @@ int main()
         .http_notify = http_notify,
         .rtc = rtc,
     });
+    auto* red = new Indicator({
+        .task_name = "ERROR",
+        .pin = Indicator::GPIO::Pin17,
+    });
     new Logger({ .task_name = "Logger" });
     new CLI({
         .task_name = "CLI",
@@ -100,6 +115,7 @@ int main()
         .v_motor_command = motor_command,
         .s_control_auto = control_auto,
         .s_http_notify = http_notify,
+        .red = red,
     });
     auto* motor = new Motor({
         .name = "Motor",
@@ -114,6 +130,7 @@ int main()
         .v_belt_position = belt_position,
         .s_http_notify = http_notify,
         .storage = storage,
+        .red = red,
     });
     auto* http = new HttpServer({
         .port = 80,
@@ -126,15 +143,18 @@ int main()
         .control_auto = control_auto,
         .auto_hourly = auto_hourly,
         .storage = storage,
+        .rtc = rtc,
     });
-
-    late_main([spi_1, http]() {
+    late_main([spi_1, http, red]() {
         if (cyw43_arch_init() != 0) {
             Logger::Log("cyw43_arch_init() failed");
+            red->On();
             return;
         }
-        new W5500LWIP(spi_1, SPI::CS(9), W5500::INT(8), W5500::RST(7));
-        http->Listen();
+        new W5500LWIP(spi_1, SPI::CS(9), W5500::INT(8), W5500::RST(7), red);
+        if (!http->Listen()) {
+            red->On();
+        }
     });
 
     Logger::Log("Semaphores: {}", RTOS::Implementation::Primitive::GetSemaphoreCount());

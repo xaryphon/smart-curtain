@@ -10,7 +10,7 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     device = config_entry.runtime_data
-    cover = SmartCurtainCover(config_entry.data.get('name'), device)
+    cover = SmartCurtainCover("Curtains", device)
     async_add_entities([cover])
 
 class SmartCurtainCover(CoverEntity):
@@ -44,11 +44,11 @@ class SmartCurtainCover(CoverEntity):
         return self._device.motor_current
 
     def open_cover(self, **kwargs):
-        self._device.send_settings({"wanted_mode": "manual", "manual": {"target": 100}})
+        self._device.send_settings({"wanted_mode": "manual", "manual": {"target": 0}})
 
     def close_cover(self, **kwargs):
-        self._device.send_settings({"wanted_mode": "manual", "manual": {"target": 0}})
+        self._device.send_settings({"wanted_mode": "manual", "manual": {"target": 100}})
 
     def set_cover_position(self, **kwargs):
         position = int(kwargs['position'])
-        self._device.send_settings({"wanted_mode": "manual", "manual": {"target": position}})
+        self._device.send_settings({"wanted_mode": "manual", "manual": {"target": 100 - position}})

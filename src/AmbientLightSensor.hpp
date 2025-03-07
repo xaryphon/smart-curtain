@@ -27,6 +27,8 @@ public:
         RTOS::Variable<Motor::Command>* v_motor_command;
         RTOS::Semaphore* s_control_auto;
         RTOS::Semaphore* s_http_notify;
+
+        Indicator* red;
     };
 
     explicit AmbientLightSensor(const Parameters& parameters);
@@ -60,4 +62,5 @@ private:
     LuxMeasurement m_measurement_als2 = { 0, 0 };
     float m_lux_average = 0;
     bool m_commanding_motor = false;
+    Indicator* m_red;
 };

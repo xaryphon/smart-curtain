@@ -412,6 +412,7 @@ void HttpConnection::HandlePOST(std::string_view path, std::string_view body)
         int manual_target = -1;
         float static_target = NAN;
         std::array<float, 24> hourly_targets = { NAN };
+        uint64_t new_time = UINT64_MAX;
 
         if (std::string_view wanted_mode = doc["wanted_mode"]; !wanted_mode.empty()) {
             if (wanted_mode == "manual") {
@@ -481,7 +482,52 @@ void HttpConnection::HandlePOST(std::string_view path, std::string_view body)
                 }
             }
         }
+        if (ArduinoJson::JsonVariantConst time_high = doc["time_high"]; !time_high.isNull()) {
+            if (!time_high.is<uint32_t>()) {
+                RespondWith("400 Bad Request", R"({"message": "Invalid time_high"})");
+                return;
+            }
+            ArduinoJson::JsonVariantConst time_low = doc["time_low"];
+            if (time_low.isNull()) {
+                RespondWith("400 Bad Request", R"({"message": "time_high is set, but time_low is missing"})");
+            }
+            if (!time_low.is<uint32_t>()) {
+                RespondWith("400 Bad Request", R"({"message": "Invalid time_low"})");
+                return;
+            }
+            uint32_t high = time_high;
+            uint32_t low = time_low;
+            new_time = static_cast<uint64_t>(high) << 32u | low;
+            if (new_time == UINT64_MAX) {
+                RespondWith("400 Bad Request", R"({"message": "Invalid time"})");
+                return;
+            }
+        } else if (!doc["time_low"].isNull()) {
+            RespondWith("400 Bad Request", R"({"message": "time_low is set, but time_high is missing"})");
+            return;
+        }
 
+        if (new_time != UINT64_MAX) {
+            datetime_t dt = { 0 };
+            dt.sec = new_time % 60u;
+            new_time /= 60;
+            dt.min = new_time % 60u;
+            new_time /= 60;
+            dt.hour = new_time % 24u;
+            new_time /= 24;
+            dt.dotw = new_time % 7u;
+            new_time /= 7;
+            dt.day = new_time % 31u + 1;
+            new_time /= 31;
+            dt.month = new_time % 12u + 1;
+            new_time /= 12;
+            dt.year = new_time % 4096;
+            new_time /= 4096;
+            if (!m_server->m_params.rtc->Set(dt)) {
+                RespondWith("400 Bad Request", R"({"message": "Could not set time, probably invalid date"})");
+                return;
+            }
+        }
         m_server->m_params.storage->WriteAccessAndProgramLocked(portMAX_DELAY, [&](Flash::Settings& settings) {
             Mode current_mode = Mode::UNKNOWN;
 

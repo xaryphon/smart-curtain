@@ -3,7 +3,7 @@
 #include <array>
 #include <cstring>
 
-#include <lwip/autoip.h>
+#include <lwip/dhcp.h>
 #include <lwip/tcpip.h>
 #include <netif/etharp.h>
 
@@ -22,9 +22,10 @@ static void W5500_InterruptHandler(uint pin, uint32_t event_mask)
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
-W5500LWIP::W5500LWIP(SPI* spi, SPI::CS pin_cs, W5500::INT pin_int, W5500::RST pin_rst)
+W5500LWIP::W5500LWIP(SPI* spi, SPI::CS pin_cs, W5500::INT pin_int, W5500::RST pin_rst, Indicator* red)
     : W5500(spi, pin_cs, pin_rst)
     , m_netif()
+    , m_red(red)
 {
     g_W5500_interrupt_pin = static_cast<uint>(pin_int);
     g_W5500_Semaphore = xSemaphoreCreateCounting(20, 0);
@@ -36,7 +37,10 @@ W5500LWIP::W5500LWIP(SPI* spi, SPI::CS pin_cs, W5500::INT pin_int, W5500::RST pi
     constexpr auto init = [](struct netif* netif) -> err_t {
         return static_cast<decltype(this)>(netif->state)->NetInit();
     };
-    netif_add_noaddr(&m_netif, this, init, tcpip_input);
+    if (netif_add_noaddr(&m_netif, this, init, tcpip_input) == nullptr) {
+        m_red->On();
+        return;
+    }
     netif_set_up(&m_netif);
 
     netif_set_status_callback(&m_netif, [](struct netif* netif) -> void {
@@ -46,7 +50,7 @@ W5500LWIP::W5500LWIP(SPI* spi, SPI::CS pin_cs, W5500::INT pin_int, W5500::RST pi
         memcpy(ip.data(), &ip_, sizeof(uint32_t));
         Logger::Log("W5500 {} {}.{}.{}.{}", netif_is_link_up(netif) ? "UP" : "DOWN", ip[0], ip[1], ip[2], ip[3]);
     });
-    autoip_start(&m_netif);
+    dhcp_start(&m_netif);
 }
 
 bool W5500LWIP::IsLinkUp()
@@ -300,6 +304,7 @@ bool W5500LWIP::ReadFreeSize(uint16_t* free_size)
     return true;
 }
 
+#if 0
 #include <lwip/autoip.h>
 #include <lwip/dhcp.h>
 #include <pico/cyw43_arch.h>
@@ -342,3 +347,4 @@ void w5500_lwip_test()
 {
     xTaskCreate(w5500_lwip_test_task, "test", 256, nullptr, tskIDLE_PRIORITY + 2, nullptr);
 }
+#endif
