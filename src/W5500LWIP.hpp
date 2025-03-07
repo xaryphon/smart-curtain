@@ -2,11 +2,12 @@
 
 #include <lwip/netif.h>
 
+#include "Indicator.hpp"
 #include "W5500.hpp"
 
 class W5500LWIP : private W5500 {
 public:
-    explicit W5500LWIP(SPI* spi, SPI::CS pin_cs, INT pin_int, RST pin_rst);
+    explicit W5500LWIP(SPI* spi, SPI::CS pin_cs, INT pin_int, RST pin_rst, Indicator* red);
 
     bool IsLinkUp();
     struct netif* GetNetif() { return &m_netif; }
@@ -22,6 +23,5 @@ private:
     bool ReadFreeSize(uint16_t* free_size);
 
     struct netif m_netif;
+    Indicator* m_red;
 };
-
-void w5500_lwip_test();
