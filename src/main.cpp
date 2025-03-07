@@ -17,10 +17,17 @@
 #include "W5500LWIP.hpp"
 #include "config.h"
 
+static constexpr uint TASK_ACTIVITY_INDICATOR_LED_PIN = 16;
+
 extern "C" {
 uint32_t read_runtime_ctr(void)
 {
     return timer_hw->timerawl;
+}
+
+void SetTaskActivityIndicatorLedStateBasedOnCurrentTaskPriority(int current_task_priority)
+{
+    gpio_put(TASK_ACTIVITY_INDICATOR_LED_PIN, current_task_priority != tskIDLE_PRIORITY);
 }
 }
 
@@ -46,6 +53,9 @@ int main()
     auto* rtc = new RTC();
     Logger::Initialize({ .rtc = rtc });
     Logger::Log("Boot");
+
+    gpio_init(TASK_ACTIVITY_INDICATOR_LED_PIN);
+    gpio_set_dir(TASK_ACTIVITY_INDICATOR_LED_PIN, GPIO_OUT);
 
     /// Serial Interfaces
     const auto i2c_1 = std::make_unique<I2C>(I2C::SDA1::PIN_2, I2C::SCL1::PIN_3, BH1750::BAUDRATE_MAX);
@@ -78,10 +88,6 @@ int main()
     auto* red = new Indicator({
         .task_name = "ERROR",
         .pin = Indicator::GPIO::Pin17,
-    });
-    [[maybe_unused]] auto* blue = new Indicator({
-        .task_name = "asd",
-        .pin = Indicator::GPIO::Pin16,
     });
     new Logger({ .task_name = "Logger" });
     new AmbientLightSensor({
