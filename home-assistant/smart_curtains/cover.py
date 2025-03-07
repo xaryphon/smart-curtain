@@ -44,11 +44,11 @@ class SmartCurtainCover(CoverEntity):
         return self._device.motor_current
 
     def open_cover(self, **kwargs):
-        self._device.send_settings({"wanted_mode": "manual", "manual": {"target": 100}})
+        self._device.send_settings({"wanted_mode": "manual", "manual": {"target": 0}})
 
     def close_cover(self, **kwargs):
-        self._device.send_settings({"wanted_mode": "manual", "manual": {"target": 0}})
+        self._device.send_settings({"wanted_mode": "manual", "manual": {"target": 100}})
 
     def set_cover_position(self, **kwargs):
         position = int(kwargs['position'])
-        self._device.send_settings({"wanted_mode": "manual", "manual": {"target": position}})
+        self._device.send_settings({"wanted_mode": "manual", "manual": {"target": 100 - position}})
