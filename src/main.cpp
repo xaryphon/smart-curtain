@@ -133,14 +133,16 @@ int main()
         .storage = storage,
         .rtc = rtc,
     });
-
-    late_main([spi_1, http]() {
+    late_main([spi_1, http, red]() {
         if (cyw43_arch_init() != 0) {
             Logger::Log("cyw43_arch_init() failed");
+            red->On();
             return;
         }
-        new W5500LWIP(spi_1, SPI::CS(9), W5500::INT(8), W5500::RST(7));
-        http->Listen();
+        new W5500LWIP(spi_1, SPI::CS(9), W5500::INT(8), W5500::RST(7), red);
+        if (!http->Listen()) {
+            red->On();
+        }
     });
 
     Logger::Log("Semaphores: {}", RTOS::Implementation::Primitive::GetSemaphoreCount());
