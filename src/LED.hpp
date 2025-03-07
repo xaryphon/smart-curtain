@@ -14,9 +14,9 @@ public:
     [[nodiscard]] uint16_t Level() const {return m_level;}
     [[nodiscard]] const char* Name() const { return m_name; }
 
+    static constexpr uint16_t WRAP = 99;
 private:
     static constexpr uint16_t DIVIDER = 125;
-    static constexpr uint16_t WRAP = 99;
     static constexpr uint16_t INIT_LEVEL = 2;
 
     uint m_pin;

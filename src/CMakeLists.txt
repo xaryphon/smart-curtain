@@ -5,6 +5,7 @@ target_sources(${PROJECT_NAME} PRIVATE
     HttpConnection.cpp
     HttpServer.cpp
     I2C.cpp
+    Indicator.cpp
     LED.cpp
     Logger.cpp
     main.cpp
