@@ -14,6 +14,7 @@ AmbientLightSensor::AmbientLightSensor(const Parameters& parameters)
     , m_v_motor_command(parameters.v_motor_command)
     , m_s_control_auto(parameters.s_control_auto)
     , m_s_http_notify(parameters.s_http_notify)
+    , m_red(parameters.red)
 {
     if (xTaskCreate(TASK_KONDOM(AmbientLightSensor, Task),
             parameters.task_name,
@@ -71,6 +72,7 @@ bool AmbientLightSensor::Measure()
         als2_working = m_als2.ReadLuxBlocking(&m_measurement_als2.lux);
         m_measurement_als2.timestamp = time_us_64(); /// TODO: change to RT
         if (!als1_working && !als2_working) {
+            m_red->On();
             return false;
         }
     } while (StartMeasuring());

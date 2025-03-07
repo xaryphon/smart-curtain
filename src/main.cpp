@@ -97,6 +97,7 @@ int main()
         .v_motor_command = motor_command,
         .s_control_auto = control_auto,
         .s_http_notify = http_notify,
+        .red = red,
     });
     auto* motor = new Motor({
         .name = "Motor",
