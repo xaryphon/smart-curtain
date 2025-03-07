@@ -95,8 +95,7 @@ void CLI::Task()
 
 void CLI::HelpCommand()
 {
-    /// TODO command response formatting and grammar improvements, extended help pages for all commands
-    /// TODO include help text in separate file for easier editing?
+    /// TODO move help text to separate file for easier editing?
     std::string cmd;
     if (!(m_input >> cmd)) {
         Logger::Log("Available commands:\n"
@@ -141,8 +140,7 @@ void CLI::HelpCommand()
                     "         'date 2015 6 18 2' will set the date to june 18th (tuesday) 2015\n"
                     "         'month 9' will set the current month to september\n"
                     "         'hour 20' will set the current hour to 20\n");
-    }
-    else {
+    } else {
         Logger::Log("Unknown command, see 'help' for all commands");
     }
 }
@@ -252,16 +250,19 @@ void CLI::DatetimeCommand()
     int min = 0;
     int sec = 0;
     /// TODO add input checking
-    m_input >> year, m_input >> month, m_input >> day, m_input >> dotw, m_input >> hour, m_input >> min, m_input >> sec;
-    datetime_t datetime = m_rtc->GetDatetime();
-    datetime.year = static_cast<int16_t>(year),
-    datetime.month = static_cast<int8_t>(month),
-    datetime.day = static_cast<int8_t>(day),
-    datetime.dotw = static_cast<int8_t>(dotw),
-    datetime.hour = static_cast<int8_t>(hour);
-    datetime.min = static_cast<int8_t>(min);
-    datetime.sec = static_cast<int8_t>(sec);
-    m_rtc->Set(datetime);
+    if (m_input >> year, m_input >> month, m_input >> day, m_input >> dotw, m_input >> hour, m_input >> min, m_input >> sec) {
+        datetime_t datetime = m_rtc->GetDatetime();
+        datetime.year = static_cast<int16_t>(year),
+        datetime.month = static_cast<int8_t>(month),
+        datetime.day = static_cast<int8_t>(day),
+        datetime.dotw = static_cast<int8_t>(dotw),
+        datetime.hour = static_cast<int8_t>(hour);
+        datetime.min = static_cast<int8_t>(min);
+        datetime.sec = static_cast<int8_t>(sec);
+        m_rtc->Set(datetime);
+    } else {
+        Logger::Log("Invalid date/time values, check input");
+    }
 }
 
 void CLI::DateCommand()
@@ -270,46 +271,61 @@ void CLI::DateCommand()
     int month = 0;
     int day = 0;
     int dotw = 0;
-    m_input >> year, m_input >> month, m_input >> day, m_input >> dotw;
-    datetime_t datetime = m_rtc->GetDatetime();
-    datetime.year = static_cast<int16_t>(year),
-    datetime.month = static_cast<int8_t>(month),
-    datetime.day = static_cast<int8_t>(day),
-    datetime.dotw = static_cast<int8_t>(dotw),
-    m_rtc->Set(datetime);
+    if (m_input >> year, m_input >> month, m_input >> day, m_input >> dotw) {
+        datetime_t datetime = m_rtc->GetDatetime();
+        datetime.year = static_cast<int16_t>(year),
+        datetime.month = static_cast<int8_t>(month),
+        datetime.day = static_cast<int8_t>(day),
+        datetime.dotw = static_cast<int8_t>(dotw),
+        m_rtc->Set(datetime);
+    } else {
+        Logger::Log("Invalid date values, check input");
+    }
 }
 
 void CLI::YearCommand()
 {
     int year = 0;
-    m_input >> year;
-    datetime_t datetime = m_rtc->GetDatetime();
-    datetime.year = static_cast<int16_t>(year),
-    m_rtc->Set(datetime);
+    if (m_input >> year) {
+        datetime_t datetime = m_rtc->GetDatetime();
+        datetime.year = static_cast<int16_t>(year),
+        m_rtc->Set(datetime);
+    } else {
+        Logger::Log("Invalid year value, check input");
+    }
 }
 void CLI::MonthCommand()
 {
     int month = 0;
-    m_input >> month;
-    datetime_t datetime = m_rtc->GetDatetime();
-    datetime.month = static_cast<int8_t>(month),
-    m_rtc->Set(datetime);
+    if (m_input >> month) {
+        datetime_t datetime = m_rtc->GetDatetime();
+        datetime.month = static_cast<int8_t>(month),
+        m_rtc->Set(datetime);
+    } else {
+        Logger::Log("Invalid month value, check input");
+    }
 }
 void CLI::DayCommand()
 {
     int day = 0;
-    m_input >> day;
-    datetime_t datetime = m_rtc->GetDatetime();
-    datetime.day = static_cast<int8_t>(day),
-    m_rtc->Set(datetime);
+    if (m_input >> day) {
+        datetime_t datetime = m_rtc->GetDatetime();
+        datetime.day = static_cast<int8_t>(day),
+        m_rtc->Set(datetime);
+    } else {
+        Logger::Log("Invalid day value, check input");
+    }
 }
 void CLI::DOTWCommand()
 {
     int dotw = 0;
-    m_input >> dotw;
-    datetime_t datetime = m_rtc->GetDatetime();
-    datetime.dotw = static_cast<int8_t>(dotw),
-    m_rtc->Set(datetime);
+    if (m_input >> dotw) {
+        datetime_t datetime = m_rtc->GetDatetime();
+        datetime.dotw = static_cast<int8_t>(dotw),
+        m_rtc->Set(datetime);
+    } else {
+        Logger::Log("Invalid dotw value, check input");
+    }
 }
 
 void CLI::TimeCommand()
@@ -317,35 +333,47 @@ void CLI::TimeCommand()
     int hour = 0;
     int min = 0;
     int sec = 0;
-    m_input >> hour, m_input >> min, m_input >> sec;
-    datetime_t datetime = m_rtc->GetDatetime();
-    datetime.hour = static_cast<int8_t>(hour);
-    datetime.min = static_cast<int8_t>(min);
-    datetime.sec = static_cast<int8_t>(sec);
-    m_rtc->Set(datetime);
+    if (m_input >> hour, m_input >> min, m_input >> sec) {
+        datetime_t datetime = m_rtc->GetDatetime();
+        datetime.hour = static_cast<int8_t>(hour);
+        datetime.min = static_cast<int8_t>(min);
+        datetime.sec = static_cast<int8_t>(sec);
+        m_rtc->Set(datetime);
+    } else {
+        Logger::Log("Invalid time values, check input");
+    }
 }
 
 void CLI::HourCommand()
 {
     int hour = 0;
-    m_input >> hour;
-    datetime_t datetime = m_rtc->GetDatetime();
-    datetime.hour = static_cast<int8_t>(hour);
-    m_rtc->Set(datetime);
+    if (m_input >> hour) {
+        datetime_t datetime = m_rtc->GetDatetime();
+        datetime.hour = static_cast<int8_t>(hour);
+        m_rtc->Set(datetime);
+    } else {
+        Logger::Log("Invalid hour value, check input");
+    }
 }
 void CLI::MinCommand()
 {
     int min = 0;
-    m_input >> min;
-    datetime_t datetime = m_rtc->GetDatetime();
-    datetime.min = static_cast<int8_t>(min);
-    m_rtc->Set(datetime);
+    if (m_input >> min) {
+        datetime_t datetime = m_rtc->GetDatetime();
+        datetime.min = static_cast<int8_t>(min);
+        m_rtc->Set(datetime);
+    } else {
+        Logger::Log("Invalid minute value, check input");
+    }
 }
 void CLI::SecCommand()
 {
     int sec = 0;
-    m_input >> sec;
-    datetime_t datetime = m_rtc->GetDatetime();
-    datetime.sec = static_cast<int8_t>(sec);
-    m_rtc->Set(datetime);
+    if (m_input >> sec) {
+        datetime_t datetime = m_rtc->GetDatetime();
+        datetime.sec = static_cast<int8_t>(sec);
+        m_rtc->Set(datetime);
+    } else {
+        Logger::Log("Invalid seconds value, check input");
+    }
 }
