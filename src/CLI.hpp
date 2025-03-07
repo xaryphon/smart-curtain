@@ -44,7 +44,14 @@ private:
     void MotorCommand();
     void RTCCommand();
     void DateCommand();
+    void YearCommand();
+    void MonthCommand();
+    void DayCommand();
+    void DOTWCommand();
     void TimeCommand();
+    void HourCommand();
+    void MinCommand();
+    void SecCommand();
 
     RTOS::Variable<float>* m_v_lux_target;
     RTOS::Variable<Motor::Command>* m_v_motor_command;
@@ -52,7 +59,6 @@ private:
     RTOS::Semaphore* m_s_http_notify;
     Storage* m_storage;
     RTC* m_rtc;
-    datetime_t m_datetime;
 
     std::stringstream m_input;
     Motor::Command MotorStringToTarget(const std::string& str);

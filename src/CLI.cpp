@@ -58,8 +58,22 @@ void CLI::ProcessCommand()
         RTCCommand();
     } else if (cmd == "date") {
         DateCommand();
+    } else if (cmd == "year") {
+        YearCommand();
+    } else if (cmd == "month") {
+        MonthCommand();
+    } else if (cmd == "day") {
+        DayCommand();
+    } else if (cmd == "dotw") {
+        DOTWCommand();
     } else if (cmd == "time") {
         TimeCommand();
+    } else if (cmd == "hour") {
+        HourCommand();
+    } else if (cmd == "min") {
+        MinCommand();
+    } else if (cmd == "sec") {
+        SecCommand();
     } else if (cmd.empty()) {
         // avoid confusing log printing if nothing is inputted and/or terminal sends both CR/LF
     } else {
@@ -94,11 +108,15 @@ void CLI::HelpCommand()
     } else if (cmd == "help") {
         Logger::Log("help - show available commands");
     } else if (cmd == "status") {
-        Logger::Log("status - shows system status, including blah blah");
+        Logger::Log("status - shows system status, including the currently configured settings");
     } else if (cmd == "target") {
         Logger::Log("target - set target lux level\n"
-                    "value can be between x and y\n"
-                    "only applies to automatic mode");
+                    "Lux target has a minimum value of 0\n"
+                    "By default, will set the static target\n"
+                    "Set the hourly targets by including the desired hour after the target\n"
+                    "only applies to automatic mode\n"
+                    "Example: 'target 500' will set the static target to 500 lux\n"
+                    "         'target 700 12' will se the target for hour 12 to 700");
     } else {
         Logger::Log("Unknown command, see 'help' for all commands");
     }
@@ -201,6 +219,23 @@ Motor::Command CLI::MotorStringToTarget(const std::string& str)
 
 void CLI::RTCCommand()
 {
+    int year;
+    int month;
+    int day;
+    int dotw;
+    int hour;
+    int min;
+    int sec;
+    m_input >> year, m_input >> month, m_input >> day, m_input >> dotw, m_input >> hour, m_input >> min, m_input >> sec;
+    datetime_t datetime = m_rtc->GetDatetime();
+    datetime.year = static_cast<int16_t>(year),
+    datetime.month = static_cast<int8_t>(month),
+    datetime.day = static_cast<int8_t>(day),
+    datetime.dotw = static_cast<int8_t>(dotw),
+    datetime.hour = static_cast<int8_t>(hour);
+    datetime.min = static_cast<int8_t>(min);
+    datetime.sec = static_cast<int8_t>(sec);
+    m_rtc->Set(datetime);
 }
 
 void CLI::DateCommand()
@@ -210,12 +245,45 @@ void CLI::DateCommand()
     int day;
     int dotw;
     m_input >> year, m_input >> month, m_input >> day, m_input >> dotw;
-    datetime_t date = m_rtc->GetDatetime();
-    date.year = static_cast<int16_t>(year),
-    date.month = static_cast<int8_t>(month),
-    date.day = static_cast<int8_t>(day),
-    date.dotw = static_cast<int8_t>(dotw),
-    printf("\n%d\n", m_rtc->Set(date) ? 1 : 0);
+    datetime_t datetime = m_rtc->GetDatetime();
+    datetime.year = static_cast<int16_t>(year),
+    datetime.month = static_cast<int8_t>(month),
+    datetime.day = static_cast<int8_t>(day),
+    datetime.dotw = static_cast<int8_t>(dotw),
+    m_rtc->Set(datetime);
+}
+
+void CLI::YearCommand()
+{
+    int year;
+    m_input >> year;
+    datetime_t datetime = m_rtc->GetDatetime();
+    datetime.year = static_cast<int16_t>(year),
+    m_rtc->Set(datetime);
+}
+void CLI::MonthCommand()
+{
+    int month;
+    m_input >> month;
+    datetime_t datetime = m_rtc->GetDatetime();
+    datetime.month = static_cast<int8_t>(month),
+    m_rtc->Set(datetime);
+}
+void CLI::DayCommand()
+{
+    int day;
+    m_input >> day;
+    datetime_t datetime = m_rtc->GetDatetime();
+    datetime.day = static_cast<int8_t>(day),
+    m_rtc->Set(datetime);
+}
+void CLI::DOTWCommand()
+{
+    int dotw;
+    m_input >> dotw;
+    datetime_t datetime = m_rtc->GetDatetime();
+    datetime.dotw = static_cast<int8_t>(dotw),
+    m_rtc->Set(datetime);
 }
 
 void CLI::TimeCommand()
@@ -224,10 +292,34 @@ void CLI::TimeCommand()
     int min;
     int sec;
     m_input >> hour, m_input >> min, m_input >> sec;
-    datetime_t time = m_rtc->GetDatetime();
-    time.hour = static_cast<int8_t>(hour);
-    time.min = static_cast<int8_t>(min);
-    time.sec = static_cast<int8_t>(sec);
+    datetime_t datetime = m_rtc->GetDatetime();
+    datetime.hour = static_cast<int8_t>(hour);
+    datetime.min = static_cast<int8_t>(min);
+    datetime.sec = static_cast<int8_t>(sec);
+    m_rtc->Set(datetime);
+}
 
-    printf("\n%d\n", m_rtc->Set(time) ? 1 : 0);
+void CLI::HourCommand()
+{
+    int hour;
+    m_input >> hour;
+    datetime_t datetime = m_rtc->GetDatetime();
+    datetime.hour = static_cast<int8_t>(hour);
+    m_rtc->Set(datetime);
+}
+void CLI::MinCommand()
+{
+    int min;
+    m_input >> min;
+    datetime_t datetime = m_rtc->GetDatetime();
+    datetime.min = static_cast<int8_t>(min);
+    m_rtc->Set(datetime);
+}
+void CLI::SecCommand()
+{
+    int sec;
+     m_input >> sec;
+    datetime_t datetime = m_rtc->GetDatetime();
+    datetime.sec = static_cast<int8_t>(sec);
+    m_rtc->Set(datetime);
 }
