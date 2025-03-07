@@ -21,6 +21,7 @@ Motor::Motor(const Parameters& parameters)
     , m_v_command(parameters.v_command)
     , m_s_control_auto(parameters.s_control_auto)
     , m_v_belt_position(parameters.v_belt_position)
+    , m_s_notify(parameters.s_http_notify)
     , m_storage(parameters.storage)
 {
     gpio_init(m_pin_step);
@@ -176,6 +177,7 @@ void Motor::Task()
 bool Motor::Calibrate()
 {
     Logger::Log("Calibrating...");
+    m_s_notify->Give();
     m_belt_position = 0;
     while (StepCW()) {
         if (++m_belt_position > OUT_OF_BOUNDS_CLOSE) {
@@ -248,6 +250,7 @@ void Motor::ConcludeCommand()
         // put it back
         m_v_command->Append(m_command, 0);
     }
+    m_s_notify->Give();
 }
 
 void Motor::PermitAutomaticControl()

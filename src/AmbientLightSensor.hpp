@@ -26,6 +26,7 @@ public:
         RTOS::Variable<float>* v_lux_target;
         RTOS::Variable<Motor::Command>* v_motor_command;
         RTOS::Semaphore* s_control_auto;
+        RTOS::Semaphore* s_http_notify;
     };
 
     explicit AmbientLightSensor(const Parameters& parameters);
@@ -50,6 +51,7 @@ private:
     RTOS::Variable<float>* m_v_lux_target;
     RTOS::Variable<Motor::Command>* m_v_motor_command;
     RTOS::Semaphore* m_s_control_auto;
+    RTOS::Semaphore* m_s_http_notify;
 
     TaskHandle_t m_task_handle = nullptr;
     TickType_t m_passive_measurement_period_ticks = pdMS_TO_TICKS(10000);
