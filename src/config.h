@@ -28,7 +28,7 @@ enum : Type {
     STORAGE = 1024,
     ALS = 1024,
     MOTOR = 512,
-    CLI = 512,
+    CLI = 1024,
     W5500LWIP = 1536,
 };
 } // namespace TaskStackSize
