@@ -155,4 +155,7 @@ to exclude the API function. */
 
 /* A header file that defines trace macro can be included here. */
 
+void SetTaskActivityIndicatorLedStateBasedOnCurrentTaskPriority(int current_task_priority);
+#define traceTASK_SWITCHED_IN() SetTaskActivityIndicatorLedStateBasedOnCurrentTaskPriority(pxCurrentTCB->uxPriority);
+
 #endif /* FREERTOS_CONFIG_H */
