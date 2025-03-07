@@ -23,6 +23,7 @@ public:
         RTOS::Semaphore* control_auto;
         RTOS::Semaphore* auto_hourly;
         Storage* storage;
+        RTC* rtc;
     };
 
     explicit HttpServer(const ConstructionParameters&);
