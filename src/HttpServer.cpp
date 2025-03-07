@@ -103,7 +103,7 @@ std::string HttpServer::BuildBody(bool include_status, bool include_settings)
         } else if (motor_command == Motor::Command::CLOSE) {
             motor_target = 0;
         } else {
-            motor_target = 100 - motor_command;
+            motor_target = motor_command;
         }
         if (motor_target < 0) {
             motor_target = 0;

@@ -65,11 +65,11 @@ class Device:
 
     @property
     def motor_target(self) -> int:
-        return self._motor_target
+        return 100 - self._motor_target
 
     @property
     def motor_current(self) -> int:
-        return self._motor_current
+        return 100 - self._motor_current
 
     @property
     def lux_target(self) -> float:
