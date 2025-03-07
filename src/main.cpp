@@ -80,7 +80,11 @@ int main()
 
         .v_lux_target = lux_target,
         .v_motor_command = motor_command,
-        .s_control_auto = control_auto });
+        .s_control_auto = control_auto,
+        .s_http_notify = http_notify,
+        .storage = storage,
+        .rtc = rtc,
+    });
 
     new AmbientLightSensor({
         .task_name = "ALS",
