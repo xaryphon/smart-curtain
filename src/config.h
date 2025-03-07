@@ -9,6 +9,7 @@ namespace TaskPriority {
 using Type = BaseType_t;
 enum : Type {
     HTTP_SUB = 1,
+    INDICATOR = 1,
     LOGGER = 1,
     STORAGE = 2,
     ALS = 3,
@@ -21,6 +22,7 @@ namespace TaskStackSize {
 using Type = configSTACK_DEPTH_TYPE;
 enum : Type {
     HTTP_SUB = 1024,
+    INDICATOR = 512,
     LOGGER = 1024,
     STORAGE = 1024,
     ALS = 1024,

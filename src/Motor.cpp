@@ -23,6 +23,7 @@ Motor::Motor(const Parameters& parameters)
     , m_v_belt_position(parameters.v_belt_position)
     , m_s_notify(parameters.s_http_notify)
     , m_storage(parameters.storage)
+    , m_red(parameters.red)
 {
     gpio_init(m_pin_step);
     gpio_set_dir(m_pin_step, GPIO_OUT);
@@ -155,6 +156,7 @@ void Motor::Task()
         case CALIBRATE:
             if (!Calibrate()) {
                 m_belt_max = 0;
+                m_red->On();
             }
             ConcludeCommand();
             if (m_belt_max != 0) {

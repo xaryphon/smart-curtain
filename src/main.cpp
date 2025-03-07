@@ -8,6 +8,7 @@
 #include "AmbientLightSensor.hpp"
 #include "HttpServer.hpp"
 #include "I2C.hpp"
+#include "Indicator.hpp"
 #include "Logger.hpp"
 #include "Motor.hpp"
 #include "Primitive.hpp"
@@ -74,6 +75,14 @@ int main()
         .http_notify = http_notify,
         .rtc = rtc,
     });
+    auto* red = new Indicator({
+        .task_name = "ERROR",
+        .pin = Indicator::GPIO::Pin17,
+    });
+    [[maybe_unused]] auto* blue = new Indicator({
+        .task_name = "asd",
+        .pin = Indicator::GPIO::Pin16,
+    });
     new Logger({ .task_name = "Logger" });
     new AmbientLightSensor({
         .task_name = "ALS",
@@ -88,6 +97,7 @@ int main()
         .v_motor_command = motor_command,
         .s_control_auto = control_auto,
         .s_http_notify = http_notify,
+        .red = red,
     });
     auto* motor = new Motor({
         .name = "Motor",
@@ -102,6 +112,7 @@ int main()
         .v_belt_position = belt_position,
         .s_http_notify = http_notify,
         .storage = storage,
+        .red = red,
     });
     auto* http = new HttpServer({
         .port = 80,

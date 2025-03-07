@@ -38,12 +38,17 @@ bool LED::Set(const uint16_t new_level)
 
 bool LED::Adjust(const int increment)
 {
-    const int new_level = m_level + increment;
-    if (new_level < 0 || WRAP < new_level) {
-        return false;
+    int new_level = m_level + increment;
+    bool at_limit = false;
+    if (new_level < 0) {
+        new_level = 0;
+        at_limit = true;
+    } else if (WRAP < new_level) {
+        new_level = WRAP;
+        at_limit = true;
     }
     m_level = new_level;
-    return Set(m_level);
+    return Set(m_level) && !at_limit;
 }
 
 /// TODO: remove
