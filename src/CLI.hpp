@@ -25,7 +25,6 @@ public:
         RTOS::Variable<float>* v_lux_target;
         RTOS::Variable<Motor::Command>* v_motor_command;
         RTOS::Semaphore* s_control_auto;
-        RTOS::Semaphore* s_http_notify;
         Storage* storage;
         RTC* rtc;
     };
@@ -42,7 +41,7 @@ private:
     void StatusCommand();
     void TargetCommand();
     void MotorCommand();
-    void RTCCommand();
+    void DatetimeCommand();
     void DateCommand();
     void YearCommand();
     void MonthCommand();
@@ -56,7 +55,6 @@ private:
     RTOS::Variable<float>* m_v_lux_target;
     RTOS::Variable<Motor::Command>* m_v_motor_command;
     RTOS::Semaphore* m_s_control_auto;
-    RTOS::Semaphore* m_s_http_notify;
     Storage* m_storage;
     RTC* m_rtc;
 

@@ -12,7 +12,6 @@ CLI::CLI(const Parameters& parameters)
     : m_v_lux_target(parameters.v_lux_target)
     , m_v_motor_command(parameters.v_motor_command)
     , m_s_control_auto(parameters.s_control_auto)
-    , m_s_http_notify(parameters.s_http_notify)
     , m_storage(parameters.storage)
     , m_rtc(parameters.rtc)
 {
@@ -48,14 +47,14 @@ void CLI::ProcessCommand()
     m_input >> cmd;
     if (cmd == "help") {
         HelpCommand();
+    } else if (cmd == "status") {
+        StatusCommand();
     } else if (cmd == "target") {
         TargetCommand();
     } else if (cmd == "motor") {
         MotorCommand();
-    } else if (cmd == "status") {
-        StatusCommand();
-    } else if (cmd == "rtc") {
-        RTCCommand();
+    } else if (cmd == "datetime") {
+        DatetimeCommand();
     } else if (cmd == "date") {
         DateCommand();
     } else if (cmd == "year") {
@@ -97,16 +96,20 @@ void CLI::Task()
 void CLI::HelpCommand()
 {
     /// TODO command response formatting and grammar improvements, extended help pages for all commands
+    /// TODO include help text in separate file for easier editing?
     std::string cmd;
     if (!(m_input >> cmd)) {
         Logger::Log("Available commands:\n"
-                    "help - show this\n"
+                    "help - show help page\n"
                     "status - show system status\n"
-                    "target X - set target lux level\n"
-                    "motor X - control motor\n"
-                    "date");
+                    "target - set target lux level\n"
+                    "motor - control the motor\n"
+                    "datetime - set system date and time\n\n"
+                    "Use 'help [command]' for additional information on each command");
     } else if (cmd == "help") {
-        Logger::Log("help - show available commands");
+        Logger::Log("help - show available commands\n"
+                    "Can also be used to see command specific information\n"
+                    "Example: 'help motor' will display information about the status command");
     } else if (cmd == "status") {
         Logger::Log("status - shows system status, including the currently configured settings");
     } else if (cmd == "target") {
@@ -117,7 +120,29 @@ void CLI::HelpCommand()
                     "only applies to automatic mode\n"
                     "Example: 'target 500' will set the static target to 500 lux\n"
                     "         'target 700 12' will se the target for hour 12 to 700");
-    } else {
+    } else if (cmd == "motor") {
+        Logger::Log("motor - control the motor\n"
+                    "Requires additional command to control motor, available commands:\n"
+                    "manual - sets the motor to manual mode\n"
+                    "auto - sets the motor to static automatic mode\n"
+                    "hourly - sets the motor to hourly automatic mode\n"
+                    "calibrate - will calibrate the motor\n"
+                    "open - fully opens the curtain\n"
+                    "close - fully closes the curtain\n"
+                    "0-100 - will move the curtain to specified position, 0%: fully open - 100%: fully closed\n"
+                    "Example: 'motor auto' will enable automatic static mode\n"
+                    "         'motor 70' will move the curtain to be 70% closed");
+    } else if (cmd == "datetime") {
+        Logger::Log("datetime - set system date and time\n"
+                    "Requires date and time information to set correctly\n"
+                    "Format is 'year month day dotw hour min sec' (dotw: day of the week, 0 is sunday)\n"
+                    "Additionally, separate commands for each attribute is available\n"
+                    "Example: 'datetime 2015 6 18 2 15 34 14' will set the date to june 18th (tuesday) 2015, and time to 15.34.14\n"
+                    "         'date 2015 6 18 2' will set the date to june 18th (tuesday) 2015\n"
+                    "         'month 9' will set the current month to september\n"
+                    "         'hour 20' will set the current hour to 20\n");
+    }
+    else {
         Logger::Log("Unknown command, see 'help' for all commands");
     }
 }
@@ -217,15 +242,16 @@ Motor::Command CLI::MotorStringToTarget(const std::string& str)
     return static_cast<Motor::Command>(-1);
 }
 
-void CLI::RTCCommand()
+void CLI::DatetimeCommand()
 {
-    int year;
-    int month;
-    int day;
-    int dotw;
-    int hour;
-    int min;
-    int sec;
+    int year = 0;
+    int month = 0;
+    int day = 0;
+    int dotw = 0;
+    int hour = 0;
+    int min = 0;
+    int sec = 0;
+    /// TODO add input checking
     m_input >> year, m_input >> month, m_input >> day, m_input >> dotw, m_input >> hour, m_input >> min, m_input >> sec;
     datetime_t datetime = m_rtc->GetDatetime();
     datetime.year = static_cast<int16_t>(year),
@@ -240,10 +266,10 @@ void CLI::RTCCommand()
 
 void CLI::DateCommand()
 {
-    int year;
-    int month;
-    int day;
-    int dotw;
+    int year = 0;
+    int month = 0;
+    int day = 0;
+    int dotw = 0;
     m_input >> year, m_input >> month, m_input >> day, m_input >> dotw;
     datetime_t datetime = m_rtc->GetDatetime();
     datetime.year = static_cast<int16_t>(year),
@@ -255,7 +281,7 @@ void CLI::DateCommand()
 
 void CLI::YearCommand()
 {
-    int year;
+    int year = 0;
     m_input >> year;
     datetime_t datetime = m_rtc->GetDatetime();
     datetime.year = static_cast<int16_t>(year),
@@ -263,7 +289,7 @@ void CLI::YearCommand()
 }
 void CLI::MonthCommand()
 {
-    int month;
+    int month = 0;
     m_input >> month;
     datetime_t datetime = m_rtc->GetDatetime();
     datetime.month = static_cast<int8_t>(month),
@@ -271,7 +297,7 @@ void CLI::MonthCommand()
 }
 void CLI::DayCommand()
 {
-    int day;
+    int day = 0;
     m_input >> day;
     datetime_t datetime = m_rtc->GetDatetime();
     datetime.day = static_cast<int8_t>(day),
@@ -279,7 +305,7 @@ void CLI::DayCommand()
 }
 void CLI::DOTWCommand()
 {
-    int dotw;
+    int dotw = 0;
     m_input >> dotw;
     datetime_t datetime = m_rtc->GetDatetime();
     datetime.dotw = static_cast<int8_t>(dotw),
@@ -288,9 +314,9 @@ void CLI::DOTWCommand()
 
 void CLI::TimeCommand()
 {
-    int hour;
-    int min;
-    int sec;
+    int hour = 0;
+    int min = 0;
+    int sec = 0;
     m_input >> hour, m_input >> min, m_input >> sec;
     datetime_t datetime = m_rtc->GetDatetime();
     datetime.hour = static_cast<int8_t>(hour);
@@ -301,7 +327,7 @@ void CLI::TimeCommand()
 
 void CLI::HourCommand()
 {
-    int hour;
+    int hour = 0;
     m_input >> hour;
     datetime_t datetime = m_rtc->GetDatetime();
     datetime.hour = static_cast<int8_t>(hour);
@@ -309,7 +335,7 @@ void CLI::HourCommand()
 }
 void CLI::MinCommand()
 {
-    int min;
+    int min = 0;
     m_input >> min;
     datetime_t datetime = m_rtc->GetDatetime();
     datetime.min = static_cast<int8_t>(min);
@@ -317,8 +343,8 @@ void CLI::MinCommand()
 }
 void CLI::SecCommand()
 {
-    int sec;
-     m_input >> sec;
+    int sec = 0;
+    m_input >> sec;
     datetime_t datetime = m_rtc->GetDatetime();
     datetime.sec = static_cast<int8_t>(sec);
     m_rtc->Set(datetime);
