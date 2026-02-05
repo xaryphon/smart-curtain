@@ -1,9 +1,9 @@
-# rp2040-freertos-CPP-template
+# Smart Curtain
 
-This is a template project for developing FreeRTOS based applications on Raspberry Pi RP2040 based boards.
-This template uses the "official" RP2040 port from the Raspberry Pi Foundation.
-A stripped down version of FreeRTOSKernel V10.6.2 is included in the project.
-All other ports except RP2040 port have been removed to reduce disk usage.
+Smart Curtain is an embedded system that adjusts a curtain of a window with a
+stepper motor automatically according to measured ambient light relative to
+user-set timely ambient light preferences or manually according to explicit user
+commands.
 
-The drivers included in the project are interrupt driven and require FreeRTOS to work correctly.
-
+This repository contains only the software implementation, including the sources
+for the microcontroller firmware and the Home Assistant component.
